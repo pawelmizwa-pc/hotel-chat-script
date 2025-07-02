@@ -1,0 +1,13 @@
+name = "hotel-chat-worker"
+main = "src/index.ts"
+compatibility_date = "2024-10-25"
+
+# KV namespace for session storage
+[[kv_namespaces]]
+binding = "CHAT_SESSIONS"
+id = "your-kv-namespace-id"
+preview_id = "1142c6a3e16d49e29161c0cfad093766"
+
+# Environment variables (will be set via wrangler secrets)
+[vars]
+ENVIRONMENT = "production" 
