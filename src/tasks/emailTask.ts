@@ -2,7 +2,7 @@ import { LangfuseService } from "../services/langfuse";
 import { OpenAIService } from "../services/openaiService";
 import { ChatMessage, LangfusePrompt } from "../types";
 import { createExcelMessage } from "../constants";
-import { observeOpenAI } from "langfuse";
+import { LangfuseTraceClient } from "langfuse";
 
 export interface EmailTaskInput {
   userMessage: string;
@@ -11,6 +11,7 @@ export interface EmailTaskInput {
   emailToolPrompt: LangfusePrompt | null;
   knowledgeBasePrompt: LangfusePrompt | null;
   sessionId: string;
+  trace?: LangfuseTraceClient; // Langfuse trace object
 }
 
 export interface EmailTaskOutput {
@@ -64,41 +65,47 @@ export class EmailTask {
       },
     ];
 
-    // Create OpenAI client with Langfuse observability
-    const baseOpenAI = this.openaiService.getClient();
+    // Create generation for this LLM call
+    const generation = input.trace
+      ? this.langfuseService.createGeneration(
+          input.trace,
+          "email-task",
+          { messages },
+          "gpt-4.1-mini"
+        )
+      : null;
 
-    // Use our configured observeOpenAI wrapper
-    const openaiWithPrompt = this.langfuseService.createObservedOpenAI(
-      baseOpenAI,
-      {
-        generationName: "email-generation",
-        sessionId: input.sessionId,
-        userId: input.sessionId,
-      }
-    );
+    // Call OpenAI directly
+    const response = await this.openaiService
+      .getClient()
+      .chat.completions.create({
+        model: "gpt-4.1-mini",
+        messages: messages.map((msg) => ({
+          role: msg.role,
+          content: msg.content,
+        })),
+        temperature: 0,
+        max_tokens: 1000,
+      });
 
-    // Call OpenAI - observeOpenAI automatically creates trace and generation
-    const response = await openaiWithPrompt.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      })),
-      temperature: 0.3,
-      max_tokens: 1000,
-    });
-
-    // Finalize and send to Langfuse
-    await this.langfuseService.flush();
-
-    return {
+    const result = {
       content: response.choices[0].message.content || "",
       usage: {
         promptTokens: response.usage?.prompt_tokens || 0,
         completionTokens: response.usage?.completion_tokens || 0,
         totalTokens: response.usage?.total_tokens || 0,
       },
-      traceId: input.sessionId, // Use sessionId as trace identifier
+      traceId: input.sessionId,
     };
+
+    // End generation with output and usage
+    if (generation) {
+      generation.end({
+        output: result.content,
+        usage: result.usage,
+      });
+    }
+
+    return result;
   }
 }

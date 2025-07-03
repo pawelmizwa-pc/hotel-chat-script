@@ -1,21 +1,15 @@
-import { Langfuse, observeOpenAI } from "langfuse";
+import {
+  Langfuse,
+  LangfuseSpanClient,
+  LangfuseTraceClient,
+  LangfuseGenerationClient,
+} from "langfuse";
 import { Env, LangfusePrompt, ChatMessage } from "../types";
-import OpenAI from "openai";
 
 export class LangfuseService {
   private langfuse: Langfuse;
 
   constructor(env: Env) {
-    // Set up global environment variables for observeOpenAI function
-    // In Cloudflare Workers, we need to make these available globally
-    if (typeof globalThis !== "undefined") {
-      globalThis.process = globalThis.process || {};
-      globalThis.process.env = globalThis.process.env || {};
-      globalThis.process.env.LANGFUSE_SECRET_KEY = env.LANGFUSE_SECRET_KEY;
-      globalThis.process.env.LANGFUSE_PUBLIC_KEY = env.LANGFUSE_PUBLIC_KEY;
-      globalThis.process.env.LANGFUSE_HOST = env.LANGFUSE_HOST;
-    }
-
     this.langfuse = new Langfuse({
       baseUrl: env.LANGFUSE_HOST,
       secretKey: env.LANGFUSE_SECRET_KEY,
@@ -24,17 +18,45 @@ export class LangfuseService {
   }
 
   /**
-   * Create an observed OpenAI client using global observeOpenAI with proper config
+   * Create a trace for the entire request
    */
-  createObservedOpenAI(
-    openaiClient: OpenAI,
-    config: {
-      generationName: string;
-      sessionId?: string;
-      userId?: string;
-    }
-  ): OpenAI {
-    return observeOpenAI(openaiClient, config);
+  createTrace(sessionId: string, input: any) {
+    return this.langfuse.trace({
+      sessionId,
+      userId: sessionId,
+      name: "hotel-chat-request",
+      input,
+    });
+  }
+
+  /**
+   * Create a span for a specific task
+   */
+  createSpan(
+    trace: LangfuseTraceClient,
+    name: string,
+    input: any
+  ): LangfuseSpanClient {
+    return trace.span({
+      name,
+      input,
+    });
+  }
+
+  /**
+   * Create a generation for LLM calls
+   */
+  createGeneration(
+    trace: LangfuseTraceClient,
+    name: string,
+    input: any,
+    model?: string
+  ): LangfuseGenerationClient {
+    return trace.generation({
+      name,
+      input,
+      model,
+    });
   }
 
   /**

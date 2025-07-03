@@ -50,6 +50,12 @@ export default {
       const memoryService = new MemoryService(env);
       const googleSheets = new GoogleSheets(env);
 
+      // Create Langfuse trace for the entire request
+      const trace = langfuseService.createTrace(chatRequest.sessionId, {
+        userMessage: chatRequest.message,
+        language: chatRequest.language,
+      });
+
       // Initialize by collecting data from all services
       const dataCollectionTask = new DataCollectionTask(
         langfuseService,
@@ -57,7 +63,8 @@ export default {
         memoryService
       );
       const collectedData = await dataCollectionTask.collectData(
-        chatRequest.sessionId
+        chatRequest.sessionId,
+        trace
       );
 
       // Initialize tasks with shared services
@@ -76,6 +83,7 @@ export default {
         guestServicePrompt: collectedData.prompts.guestService,
         knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
         sessionId: chatRequest.sessionId,
+        trace,
       });
 
       // 2nd & 3rd OpenAI calls: run in parallel using first call output
@@ -88,6 +96,7 @@ export default {
           buttonsPrompt: collectedData.prompts.buttons,
           knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
           sessionId: chatRequest.sessionId,
+          trace,
         }),
         // 3rd OpenAI call: output from 1st + excel + knowledge-base-tool prompt + user input
         emailTask.execute({
@@ -97,12 +106,9 @@ export default {
           emailToolPrompt: collectedData.prompts.emailTool,
           knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
           sessionId: chatRequest.sessionId,
+          trace,
         }),
       ]);
-
-      console.log("firstResponse", JSON.stringify(firstResponse, null, 2));
-      console.log("secondResponse", JSON.stringify(secondResponse, null, 2));
-      console.log("thirdResponse", JSON.stringify(thirdResponse, null, 2));
 
       // Parse buttons from secondResponse
       let buttons: Array<{ type: "postback"; title: string; payload: string }> =
@@ -171,6 +177,38 @@ export default {
         console.error("Failed to save session memory:", error);
         // Don't fail the request if memory saving fails
       }
+
+      // Calculate total usage from all tasks
+      const totalUsage = {
+        promptTokens:
+          (firstResponse.usage?.promptTokens || 0) +
+          (secondResponse.usage?.promptTokens || 0) +
+          (thirdResponse.usage?.promptTokens || 0),
+        completionTokens:
+          (firstResponse.usage?.completionTokens || 0) +
+          (secondResponse.usage?.completionTokens || 0) +
+          (thirdResponse.usage?.completionTokens || 0),
+        totalTokens:
+          (firstResponse.usage?.totalTokens || 0) +
+          (secondResponse.usage?.totalTokens || 0) +
+          (thirdResponse.usage?.totalTokens || 0),
+      };
+
+      // End the trace with the final response and usage summary
+      trace.update({
+        output: response,
+        metadata: {
+          totalUsage,
+          taskBreakdown: {
+            guestServiceTask: firstResponse.usage,
+            buttonsTask: secondResponse.usage,
+            emailTask: thirdResponse.usage,
+          },
+        },
+      });
+
+      // Flush Langfuse before returning
+      await langfuseService.flush();
 
       // Return response
       return new Response(JSON.stringify(response), {
