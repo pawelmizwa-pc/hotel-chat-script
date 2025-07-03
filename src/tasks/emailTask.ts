@@ -79,12 +79,12 @@ export class EmailTask {
 
     // Call OpenAI - observeOpenAI automatically creates trace and generation
     const response = await openaiWithPrompt.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4.1-mini",
       messages: messages.map((msg) => ({
         role: msg.role,
         content: msg.content,
       })),
-      temperature: 0,
+      temperature: 0.3,
       max_tokens: 1000,
     });
 

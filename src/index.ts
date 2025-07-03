@@ -100,6 +100,10 @@ export default {
         }),
       ]);
 
+      console.log("firstResponse", JSON.stringify(firstResponse, null, 2));
+      console.log("secondResponse", JSON.stringify(secondResponse, null, 2));
+      console.log("thirdResponse", JSON.stringify(thirdResponse, null, 2));
+
       // Parse buttons from secondResponse
       let buttons: Array<{ type: "postback"; title: string; payload: string }> =
         [];
@@ -116,6 +120,8 @@ export default {
         console.warn("Failed to parse buttons from secondResponse:", error);
       }
 
+      const thirdResponseContent = JSON.parse(thirdResponse.content);
+
       // Create the response structure
       const response: ChatResponse = {
         recipient: {
@@ -128,7 +134,9 @@ export default {
             payload: {
               template_type: "button",
               language: chatRequest.language || "en",
-              text: thirdResponse.content,
+              text: thirdResponseContent.duringEmailClarification
+                ? thirdResponseContent.clarificationText
+                : firstResponse.content,
               buttons: buttons,
             },
           },
