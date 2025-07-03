@@ -9,7 +9,7 @@
     "build": "tsc",
     "type-check": "tsc --noEmit",
     "test": "node scripts/test.js",
-    "test:prod": "node scripts/test.js https://your-worker.your-subdomain.workers.dev",
+    "test:prod": "node scripts/test.js https://87976533-hotel-chat.pawel-mizwa.workers.dev",
     "install:clean": "rm -rf node_modules package-lock.json && npm install --legacy-peer-deps",
     "setup:local": "./scripts/setup-local.sh"
   },
@@ -26,6 +26,7 @@
     "@langchain/core": "^0.2.31",
     "@langchain/openai": "^0.2.8",
     "langchain": "^0.2.18",
-    "langfuse": "^3.22.0"
+    "langfuse": "^3.22.0",
+    "google-spreadsheet": "^4.1.4"
   }
 } 

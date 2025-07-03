@@ -2,7 +2,8 @@
 
 // Hotel Smile Chat Agent - Test Script
 
-const WORKER_URL = process.argv[2] || "http://localhost:8787";
+const WORKER_URL =
+  process.argv[2] || "https://1c32b8bd-hotel-chat.pawel-mizwa.workers.dev";
 
 const testCases = [
   {

@@ -52,8 +52,7 @@ export interface Env {
   LANGFUSE_PUBLIC_KEY: string;
 
   // Google Sheets
-  GOOGLE_SHEETS_CLIENT_EMAIL: string;
-  GOOGLE_SHEETS_PRIVATE_KEY: string;
+  GOOGLE_SHEETS_API_KEY: string;
   GOOGLE_SHEETS_DOCUMENT_ID: string;
 
   // Gmail

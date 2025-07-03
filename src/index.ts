@@ -41,7 +41,11 @@ export default {
       const chatService = new ChatService(env);
 
       // Process the message
-      const response = await chatService.processMessage(chatRequest);
+      const response = await chatService.processMessage(
+        chatRequest.message,
+        chatRequest.sessionId,
+        []
+      );
 
       // Return response
       return new Response(JSON.stringify(response), {

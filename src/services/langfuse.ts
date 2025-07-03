@@ -1,47 +1,243 @@
+import { Langfuse, observeOpenAI } from "langfuse";
 import { Env, LangfusePrompt } from "../types";
 
 export class LangfuseService {
-  private host: string;
-  private secretKey: string;
-  private publicKey: string;
+  private langfuse: Langfuse;
 
   constructor(env: Env) {
-    this.host = env.LANGFUSE_HOST;
-    this.secretKey = env.LANGFUSE_SECRET_KEY;
-    this.publicKey = env.LANGFUSE_PUBLIC_KEY;
+    this.langfuse = new Langfuse({
+      secretKey: env.LANGFUSE_SECRET_KEY,
+      publicKey: env.LANGFUSE_PUBLIC_KEY,
+      baseUrl: env.LANGFUSE_HOST,
+      // Enable OpenAI integration for automatic token tracking
+      flushAt: 1, // Flush events immediately (important for Cloudflare Workers)
+    });
   }
 
-  private getAuthHeader(): string {
-    const credentials = `${this.publicKey}:${this.secretKey}`;
-    return `Basic ${btoa(credentials)}`;
+  // Get the Langfuse client instance for direct usage
+  getClient(): Langfuse {
+    return this.langfuse;
   }
 
-  async getPrompt(promptName: string): Promise<LangfusePrompt> {
-    const url = `${this.host}/api/public/v2/prompts/${promptName}`;
+  // Create an observed OpenAI model instance with automatic tracking
+  createObservedOpenAI<T extends object>(
+    model: T,
+    config: {
+      generationName: string;
+      metadata?: Record<string, any>;
+    }
+  ) {
+    return observeOpenAI(model, {
+      generationName: config.generationName,
+      metadata: {
+        service: "hotel-chat-agent",
+        timestamp: new Date().toISOString(),
+        ...config.metadata,
+      },
+    });
+  }
 
+  // Get a specific prompt from Langfuse with observe tracking
+  async getPrompt(
+    promptName: string,
+    sessionId?: string
+  ): Promise<LangfusePrompt> {
     try {
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          Authorization: this.getAuthHeader(),
-          "Content-Type": "application/json",
+      // Create prompt fetch trace
+      const trace = this.langfuse.trace({
+        name: "prompt-fetch",
+        input: { promptName },
+        metadata: {
+          sessionId: sessionId || "unknown",
+          service: "hotel-chat-agent",
+          timestamp: new Date().toISOString(),
         },
       });
 
-      if (!response.ok) {
-        console.warn(`Failed to fetch prompt ${promptName}, using fallback`);
-        return this.getFallbackPrompt(promptName);
-      }
+      const prompt = await this.langfuse.getPrompt(promptName);
 
-      const data = await response.json();
-      return data as LangfusePrompt;
+      // Log successful prompt fetch
+      trace.update({
+        output: {
+          promptFound: true,
+          promptLength: prompt.prompt?.length || 0,
+          hasConfig: !!prompt.config,
+        },
+        metadata: {
+          promptName,
+          version: prompt.version || "latest",
+          success: true,
+        },
+      });
+
+      // Track prompt usage
+      this.langfuse.event({
+        name: "prompt-used",
+        input: { promptName },
+        metadata: {
+          sessionId: sessionId || "unknown",
+          promptName,
+          version: prompt.version || "latest",
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      return {
+        prompt: prompt.prompt,
+        config: prompt.config || {},
+      };
     } catch (error) {
       console.warn(
-        `Error fetching prompt ${promptName}, using fallback:`,
+        `Failed to fetch prompt ${promptName}, using fallback:`,
         error
       );
+
+      // Log prompt fetch failure
+      this.langfuse.event({
+        name: "prompt-fallback",
+        input: { promptName },
+        metadata: {
+          sessionId: sessionId || "unknown",
+          promptName,
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString(),
+        },
+      });
+
       return this.getFallbackPrompt(promptName);
     }
+  }
+
+  // Observe prompt execution with LLM generation tracking
+  async observePromptExecution(
+    promptName: string,
+    input: string,
+    output: string,
+    sessionId: string,
+    metadata?: Record<string, any>
+  ) {
+    return this.langfuse.generation({
+      name: `prompt-execution-${promptName}`,
+      input: input,
+      output: output,
+      model: metadata?.model || "gpt-4o-mini",
+      metadata: {
+        promptName,
+        sessionId,
+        service: "hotel-chat-agent",
+        timestamp: new Date().toISOString(),
+        ...metadata,
+      },
+    });
+  }
+
+  // Track prompt performance and effectiveness
+  async trackPromptPerformance(
+    promptName: string,
+    sessionId: string,
+    performance: {
+      responseTime: number;
+      tokenUsage?: number;
+      success: boolean;
+      userSatisfaction?: number;
+    }
+  ) {
+    return this.langfuse.event({
+      name: "prompt-performance",
+      metadata: {
+        promptName,
+        sessionId,
+        ...performance,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  // Create a new trace for conversation tracking
+  createTrace(sessionId: string, input: string) {
+    return this.langfuse.trace({
+      id: `trace-${sessionId}-${Date.now()}`,
+      sessionId: sessionId,
+      input: input,
+      metadata: {
+        service: "hotel-chat-agent",
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  // Log a user message
+  logUserMessage(sessionId: string, message: string) {
+    return this.langfuse.event({
+      name: "user-message",
+      input: message,
+      metadata: {
+        sessionId: sessionId,
+        role: "user",
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  // Log assistant response
+  logAssistantResponse(
+    sessionId: string,
+    response: string,
+    tokensUsed?: number
+  ) {
+    return this.langfuse.event({
+      name: "assistant-response",
+      output: response,
+      metadata: {
+        sessionId: sessionId,
+        role: "assistant",
+        tokensUsed: tokensUsed,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  // Log tool usage
+  logToolUsage(
+    sessionId: string,
+    toolName: string,
+    input: string,
+    output: string
+  ) {
+    return this.langfuse.event({
+      name: "tool-usage",
+      input: input,
+      output: output,
+      metadata: {
+        sessionId: sessionId,
+        toolName: toolName,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  // Log errors
+  logError(sessionId: string, error: string, context?: any) {
+    return this.langfuse.event({
+      name: "error",
+      level: "ERROR",
+      metadata: {
+        sessionId: sessionId,
+        error: error,
+        context: context,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  // Flush pending events (important for Cloudflare Workers)
+  async flush() {
+    await this.langfuse.flushAsync();
+  }
+
+  // Shutdown the client
+  async shutdown() {
+    await this.langfuse.shutdownAsync();
   }
 
   private getFallbackPrompt(promptName: string): LangfusePrompt {
@@ -80,17 +276,42 @@ Zwróć odpowiedź w formacie:
     };
   }
 
-  async getAllPrompts(): Promise<{
+  async getAllPrompts(sessionId?: string): Promise<{
     guestService: LangfusePrompt;
     buttons: LangfusePrompt;
     knowledgeBaseTool: LangfusePrompt;
   }> {
     try {
+      // Track batch prompt fetching
+      const batchTrace = this.langfuse.trace({
+        name: "prompts-batch-fetch",
+        input: {
+          promptNames: ["guest-service", "buttons", "knowledge-base-tool"],
+        },
+        metadata: {
+          sessionId: sessionId || "unknown",
+          service: "hotel-chat-agent",
+          timestamp: new Date().toISOString(),
+        },
+      });
+
       const [guestService, buttons, knowledgeBaseTool] = await Promise.all([
-        this.getPrompt("guest-service"),
-        this.getPrompt("buttons"),
-        this.getPrompt("knowledge-base-tool"),
+        this.getPrompt("guest-service", sessionId),
+        this.getPrompt("buttons", sessionId),
+        this.getPrompt("knowledge-base-tool", sessionId),
       ]);
+
+      // Update batch trace with success
+      batchTrace.update({
+        output: {
+          fetchedPrompts: 3,
+          success: true,
+        },
+        metadata: {
+          allPromptsLoaded: true,
+          timestamp: new Date().toISOString(),
+        },
+      });
 
       return {
         guestService,
@@ -99,6 +320,17 @@ Zwróć odpowiedź w formacie:
       };
     } catch (error) {
       console.error("Error fetching all prompts:", error);
+
+      // Log batch fetch error
+      this.langfuse.event({
+        name: "prompts-batch-error",
+        metadata: {
+          sessionId: sessionId || "unknown",
+          error: error instanceof Error ? error.message : String(error),
+          timestamp: new Date().toISOString(),
+        },
+      });
+
       // Return all fallback prompts
       return {
         guestService: this.getFallbackPrompt("guest-service"),
