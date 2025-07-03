@@ -46,7 +46,7 @@ export class GuestServiceTask {
       },
       // Assistant messages (excel + history)
       {
-        role: "assistant",
+        role: "system",
         content: createExcelMessage(
           input.knowledgeBasePrompt?.prompt || "",
           input.excelData
