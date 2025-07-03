@@ -1,342 +1,386 @@
 import { Langfuse, observeOpenAI } from "langfuse";
-import { Env, LangfusePrompt } from "../types";
+import { Env, LangfusePrompt, ChatMessage } from "../types";
+import OpenAI from "openai";
 
 export class LangfuseService {
   private langfuse: Langfuse;
+  private env: Env;
 
   constructor(env: Env) {
+    this.env = env;
     this.langfuse = new Langfuse({
+      baseUrl: env.LANGFUSE_HOST,
       secretKey: env.LANGFUSE_SECRET_KEY,
       publicKey: env.LANGFUSE_PUBLIC_KEY,
-      baseUrl: env.LANGFUSE_HOST,
-      // Enable OpenAI integration for automatic token tracking
-      flushAt: 1, // Flush events immediately (important for Cloudflare Workers)
     });
   }
 
-  // Get the Langfuse client instance for direct usage
-  getClient(): Langfuse {
-    return this.langfuse;
-  }
-
-  // Create an observed OpenAI model instance with automatic tracking
-  createObservedOpenAI<T extends object>(
-    model: T,
-    config: {
-      generationName: string;
-      metadata?: Record<string, any>;
-    }
-  ) {
-    return observeOpenAI(model, {
-      generationName: config.generationName,
-      metadata: {
-        service: "hotel-chat-agent",
-        timestamp: new Date().toISOString(),
-        ...config.metadata,
-      },
-    });
-  }
-
-  // Get a specific prompt from Langfuse with observe tracking
+  /**
+   * Get a prompt from Langfuse by name
+   * @param promptName The name of the prompt to retrieve
+   * @param version Optional version number, defaults to latest
+   * @returns Promise<LangfusePrompt | null>
+   */
   async getPrompt(
     promptName: string,
-    sessionId?: string
-  ): Promise<LangfusePrompt> {
+    version?: number
+  ): Promise<LangfusePrompt | null> {
     try {
-      // Create prompt fetch trace
-      const trace = this.langfuse.trace({
-        name: "prompt-fetch",
-        input: { promptName },
-        metadata: {
-          sessionId: sessionId || "unknown",
-          service: "hotel-chat-agent",
-          timestamp: new Date().toISOString(),
-        },
-      });
-
-      const prompt = await this.langfuse.getPrompt(promptName);
-
-      // Log successful prompt fetch
-      trace.update({
-        output: {
-          promptFound: true,
-          promptLength: prompt.prompt?.length || 0,
-          hasConfig: !!prompt.config,
-        },
-        metadata: {
-          promptName,
-          version: prompt.version || "latest",
-          success: true,
-        },
-      });
-
-      // Track prompt usage
-      this.langfuse.event({
-        name: "prompt-used",
-        input: { promptName },
-        metadata: {
-          sessionId: sessionId || "unknown",
-          promptName,
-          version: prompt.version || "latest",
-          timestamp: new Date().toISOString(),
-        },
-      });
+      const prompt = await this.langfuse.getPrompt(promptName, version);
+      if (!prompt) {
+        console.warn(`Prompt ${promptName} not found`);
+        return null;
+      }
 
       return {
         prompt: prompt.prompt,
         config: prompt.config || {},
       };
     } catch (error) {
-      console.warn(
-        `Failed to fetch prompt ${promptName}, using fallback:`,
-        error
-      );
-
-      // Log prompt fetch failure
-      this.langfuse.event({
-        name: "prompt-fallback",
-        input: { promptName },
-        metadata: {
-          sessionId: sessionId || "unknown",
-          promptName,
-          error: error instanceof Error ? error.message : String(error),
-          timestamp: new Date().toISOString(),
-        },
-      });
-
-      return this.getFallbackPrompt(promptName);
+      console.error(`Error fetching prompt ${promptName}:`, error);
+      return null;
     }
   }
 
-  // Observe prompt execution with LLM generation tracking
-  async observePromptExecution(
-    promptName: string,
-    input: string,
-    output: string,
-    sessionId: string,
-    metadata?: Record<string, any>
-  ) {
-    return this.langfuse.generation({
-      name: `prompt-execution-${promptName}`,
-      input: input,
-      output: output,
-      model: metadata?.model || "gpt-4o-mini",
+  /**
+   * Create a new trace for a chat session
+   * @param sessionId The chat session ID
+   * @param userId Optional user ID
+   * @returns Trace object
+   */
+  createTrace(sessionId: string, userId?: string) {
+    return this.langfuse.trace({
+      sessionId,
+      userId,
+      name: "hotel-chat-conversation",
       metadata: {
-        promptName,
-        sessionId,
-        service: "hotel-chat-agent",
+        service: "hotel-chat-worker",
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
+   * Create a span within a trace for OpenAI calls
+   * @param trace The parent trace
+   * @param name The name of the span
+   * @param input The input to the OpenAI call
+   * @returns Span object
+   */
+  createSpan(trace: any, name: string, input: any) {
+    return trace.span({
+      name,
+      input,
+      startTime: new Date(),
+      metadata: {
+        model: "gpt-4",
+        provider: "openai",
+      },
+    });
+  }
+
+  /**
+   * Create a generation entry for OpenAI API calls
+   * @param trace The parent trace
+   * @param name The name of the generation
+   * @param input The input messages
+   * @param model The model used
+   * @returns Generation object
+   */
+  createGeneration(
+    trace: any,
+    name: string,
+    input: ChatMessage[],
+    model: string = "gpt-4"
+  ) {
+    return trace.generation({
+      name,
+      input,
+      model,
+      modelParameters: {
+        temperature: 0.7,
+        maxTokens: 1000,
+      },
+      startTime: new Date(),
+    });
+  }
+
+  /**
+   * End a generation with the response and usage information
+   * @param generation The generation object
+   * @param output The response from OpenAI
+   * @param usage Usage statistics
+   */
+  endGeneration(
+    generation: any,
+    output: string,
+    usage?: {
+      promptTokens?: number;
+      completionTokens?: number;
+      totalTokens?: number;
+    }
+  ) {
+    generation.end({
+      output,
+      endTime: new Date(),
+      usage: usage
+        ? {
+            promptTokens: usage.promptTokens,
+            completionTokens: usage.completionTokens,
+            totalTokens: usage.totalTokens,
+          }
+        : undefined,
+    });
+  }
+
+  /**
+   * Create an OpenAI wrapper that automatically traces calls
+   * @param trace The parent trace
+   * @returns Object with traced OpenAI methods
+   */
+  createOpenAITracer(trace: any) {
+    const self = this;
+    return {
+      /**
+       * Trace a chat completion call
+       * @param messages The messages to send
+       * @param model The model to use
+       * @param temperature The temperature setting
+       * @returns Promise with the response and generation object
+       */
+      async traceChatCompletion(
+        messages: ChatMessage[],
+        model: string = "gpt-4",
+        temperature: number = 0.7
+      ): Promise<{
+        generation: any;
+        startTime: number;
+        messages: ChatMessage[];
+        model: string;
+        temperature: number;
+      }> {
+        const generation = self.createGeneration(
+          trace,
+          "chat-completion",
+          messages,
+          model
+        );
+
+        try {
+          // This would be used with your OpenAI client
+          const startTime = Date.now();
+
+          // Return the generation object so the caller can complete it
+          return {
+            generation,
+            startTime,
+            messages,
+            model,
+            temperature,
+          };
+        } catch (error) {
+          generation.end({
+            output: null,
+            endTime: new Date(),
+            level: "ERROR",
+            statusMessage:
+              error instanceof Error ? error.message : "Unknown error",
+          });
+          throw error;
+        }
+      },
+    };
+  }
+
+  /**
+   * Log user feedback on a generation
+   * @param traceId The trace ID
+   * @param score Numerical score (1-5)
+   * @param comment Optional comment
+   */
+  async logFeedback(traceId: string, score: number, comment?: string) {
+    try {
+      await this.langfuse.score({
+        traceId,
+        name: "user-feedback",
+        value: score,
+        comment,
+      });
+    } catch (error) {
+      console.error("Error logging feedback:", error);
+    }
+  }
+
+  /**
+   * Log an event within a trace
+   * @param trace The parent trace
+   * @param name The event name
+   * @param metadata Additional metadata
+   */
+  logEvent(trace: any, name: string, metadata?: Record<string, any>) {
+    trace.event({
+      name,
+      metadata: {
+        ...metadata,
+        timestamp: new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
+   * Update trace with final session information
+   * @param trace The trace object
+   * @param output The final response
+   * @param metadata Additional metadata
+   */
+  endTrace(trace: any, output?: any, metadata?: Record<string, any>) {
+    trace.update({
+      output,
+      metadata: {
+        ...metadata,
+        endTime: new Date().toISOString(),
+      },
+    });
+  }
+
+  /**
+   * Flush all pending events to Langfuse
+   * This is important for Cloudflare Workers to ensure events are sent
+   */
+  async flush() {
+    try {
+      await this.langfuse.flushAsync();
+    } catch (error) {
+      console.error("Error flushing Langfuse events:", error);
+    }
+  }
+
+  /**
+   * Wrap an OpenAI client with automatic Langfuse observability
+   * @param openaiClient The OpenAI client to wrap
+   * @param sessionId Optional session ID for grouping traces
+   * @param userId Optional user ID for user-specific tracking
+   * @returns OpenAI client wrapped with Langfuse observability
+   */
+  observeOpenAI(
+    openaiClient: OpenAI,
+    sessionId?: string,
+    userId?: string
+  ): OpenAI {
+    return observeOpenAI(openaiClient, {
+      generationName: "hotel-chat-completion",
+      sessionId,
+      userId,
+    });
+  }
+
+  /**
+   * Wrap an OpenAI client with automatic observability and custom trace settings
+   * @param openaiClient The OpenAI client to wrap
+   * @param traceId Optional trace ID to associate calls with
+   * @param sessionId Optional session ID
+   * @param userId Optional user ID
+   * @param metadata Optional metadata to include in traces
+   * @returns OpenAI client wrapped with Langfuse observability
+   */
+  observeOpenAIWithTrace(
+    openaiClient: OpenAI,
+    traceId?: string,
+    sessionId?: string,
+    userId?: string,
+    metadata?: Record<string, any>
+  ): OpenAI {
+    return observeOpenAI(openaiClient, {
+      generationName: "hotel-chat-completion",
+      traceId,
+      sessionId,
+      userId,
+      metadata: {
+        service: "hotel-chat-worker",
         timestamp: new Date().toISOString(),
         ...metadata,
       },
     });
   }
 
-  // Track prompt performance and effectiveness
-  async trackPromptPerformance(
-    promptName: string,
-    sessionId: string,
-    performance: {
-      responseTime: number;
-      tokenUsage?: number;
-      success: boolean;
-      userSatisfaction?: number;
-    }
-  ) {
-    return this.langfuse.event({
-      name: "prompt-performance",
-      metadata: {
-        promptName,
-        sessionId,
-        ...performance,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  }
-
-  // Create a new trace for conversation tracking
-  createTrace(sessionId: string, input: string) {
-    return this.langfuse.trace({
-      id: `trace-${sessionId}-${Date.now()}`,
-      sessionId: sessionId,
-      input: input,
-      metadata: {
-        service: "hotel-chat-agent",
-        timestamp: new Date().toISOString(),
-      },
-    });
-  }
-
-  // Log a user message
-  logUserMessage(sessionId: string, message: string) {
-    return this.langfuse.event({
-      name: "user-message",
-      input: message,
-      metadata: {
-        sessionId: sessionId,
-        role: "user",
-        timestamp: new Date().toISOString(),
-      },
-    });
-  }
-
-  // Log assistant response
-  logAssistantResponse(
-    sessionId: string,
-    response: string,
-    tokensUsed?: number
-  ) {
-    return this.langfuse.event({
-      name: "assistant-response",
-      output: response,
-      metadata: {
-        sessionId: sessionId,
-        role: "assistant",
-        tokensUsed: tokensUsed,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  }
-
-  // Log tool usage
-  logToolUsage(
-    sessionId: string,
-    toolName: string,
-    input: string,
-    output: string
-  ) {
-    return this.langfuse.event({
-      name: "tool-usage",
-      input: input,
-      output: output,
-      metadata: {
-        sessionId: sessionId,
-        toolName: toolName,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  }
-
-  // Log errors
-  logError(sessionId: string, error: string, context?: any) {
-    return this.langfuse.event({
-      name: "error",
-      level: "ERROR",
-      metadata: {
-        sessionId: sessionId,
-        error: error,
-        context: context,
-        timestamp: new Date().toISOString(),
-      },
-    });
-  }
-
-  // Flush pending events (important for Cloudflare Workers)
-  async flush() {
-    await this.langfuse.flushAsync();
-  }
-
-  // Shutdown the client
-  async shutdown() {
-    await this.langfuse.shutdownAsync();
-  }
-
-  private getFallbackPrompt(promptName: string): LangfusePrompt {
-    const fallbackPrompts: Record<string, string> = {
-      "guest-service": `Jesteś Zosia, wirtualnym asystentem Hotelu Smile. Odpowiadasz w języku polskim na pytania gości dotyczące hotelu, jego usług i atrakcji w okolicy.
-
-Główne informacje o hotelu:
-- Hotel Smile to nowoczesny hotel z basenem, SPA i restauracją
-- Śniadania serwowane codziennie 7:00-10:30
-- Hasło WiFi: SmileGuest2024
-- Basen czynny: 8:00-22:00
-- SPA oferuje masaże relaksacyjne, aromaterapię i zabiegi odnowy biologicznej
-
-Bądź pomocna, przyjazna i profesjonalna. Jeśli nie masz informacji, skieruj gościa do recepcji.`,
-
-      buttons: `Na podstawie rozmowy z gościem, wygeneruj maksymalnie 4 przydatne przyciski szybkich akcji w formacie JSON.
-
-Przykładowe przyciski:
-- Hasło WiFi (payload: "1")
-- Godziny śniadań (payload: "2") 
-- Oferta SPA (payload: "3")
-- Informacje o basenie (payload: "pool")
-- Atrakcje w okolicy (payload: "attractions")
-- Kontakt z recepcją (payload: "contact")
-
-Zwróć odpowiedź w formacie:
-{"result": [{"title": "Nazwa przycisku", "payload": "wartość"}]}`,
-
-      "knowledge-base-tool": `To narzędzie pozwala przeszukiwać bazę wiedzy hotelu w Google Sheets. Użyj go, gdy gość pyta o szczegółowe informacje dotyczące usług hotelowych, cennika, godzin otwarcia czy atrakcji lokalnych.`,
-    };
+  /**
+   * Get common hotel chat prompts
+   * @returns Object with commonly used prompts
+   */
+  async getHotelChatPrompts() {
+    const prompts = await Promise.allSettled([
+      this.getPrompt("hotel-welcome"),
+      this.getPrompt("hotel-booking-assistant"),
+      this.getPrompt("hotel-concierge"),
+      this.getPrompt("hotel-problem-solver"),
+    ]);
 
     return {
-      prompt:
-        fallbackPrompts[promptName] || `Fallback prompt for ${promptName}`,
-      config: {},
+      welcome: prompts[0].status === "fulfilled" ? prompts[0].value : null,
+      booking: prompts[1].status === "fulfilled" ? prompts[1].value : null,
+      concierge: prompts[2].status === "fulfilled" ? prompts[2].value : null,
+      problemSolver:
+        prompts[3].status === "fulfilled" ? prompts[3].value : null,
     };
   }
 
-  async getAllPrompts(sessionId?: string): Promise<{
-    guestService: LangfusePrompt;
-    buttons: LangfusePrompt;
-    knowledgeBaseTool: LangfusePrompt;
-  }> {
-    try {
-      // Track batch prompt fetching
-      const batchTrace = this.langfuse.trace({
-        name: "prompts-batch-fetch",
-        input: {
-          promptNames: ["guest-service", "buttons", "knowledge-base-tool"],
-        },
-        metadata: {
-          sessionId: sessionId || "unknown",
-          service: "hotel-chat-agent",
-          timestamp: new Date().toISOString(),
-        },
+  /**
+   * Create a complete conversation trace with automatic OpenAI monitoring
+   * @param sessionId The session ID
+   * @param userMessage The user's message
+   * @param systemPrompt The system prompt used
+   * @returns Trace and generation objects for completing the flow
+   */
+  async startConversationTrace(
+    sessionId: string,
+    userMessage: string,
+    systemPrompt?: string
+  ) {
+    const trace = this.createTrace(sessionId);
+
+    this.logEvent(trace, "conversation-start", {
+      userMessage,
+      systemPrompt: systemPrompt ? "present" : "none",
+    });
+
+    const messages: ChatMessage[] = [];
+    if (systemPrompt) {
+      messages.push({
+        role: "system",
+        content: systemPrompt,
+        timestamp: Date.now(),
       });
-
-      const [guestService, buttons, knowledgeBaseTool] = await Promise.all([
-        this.getPrompt("guest-service", sessionId),
-        this.getPrompt("buttons", sessionId),
-        this.getPrompt("knowledge-base-tool", sessionId),
-      ]);
-
-      // Update batch trace with success
-      batchTrace.update({
-        output: {
-          fetchedPrompts: 3,
-          success: true,
-        },
-        metadata: {
-          allPromptsLoaded: true,
-          timestamp: new Date().toISOString(),
-        },
-      });
-
-      return {
-        guestService,
-        buttons,
-        knowledgeBaseTool,
-      };
-    } catch (error) {
-      console.error("Error fetching all prompts:", error);
-
-      // Log batch fetch error
-      this.langfuse.event({
-        name: "prompts-batch-error",
-        metadata: {
-          sessionId: sessionId || "unknown",
-          error: error instanceof Error ? error.message : String(error),
-          timestamp: new Date().toISOString(),
-        },
-      });
-
-      // Return all fallback prompts
-      return {
-        guestService: this.getFallbackPrompt("guest-service"),
-        buttons: this.getFallbackPrompt("buttons"),
-        knowledgeBaseTool: this.getFallbackPrompt("knowledge-base-tool"),
-      };
     }
+    messages.push({
+      role: "user",
+      content: userMessage,
+      timestamp: Date.now(),
+    });
+
+    const tracer = this.createOpenAITracer(trace);
+    const generationData = await tracer.traceChatCompletion(messages);
+
+    return {
+      trace,
+      generationData,
+      completeConversation: (
+        response: string,
+        usage?: {
+          promptTokens?: number;
+          completionTokens?: number;
+          totalTokens?: number;
+        }
+      ) => {
+        this.endGeneration(generationData.generation, response, usage);
+        this.logEvent(trace, "conversation-complete", {
+          responseLength: response.length,
+          usage,
+        });
+        this.endTrace(trace, response, {
+          conversationComplete: true,
+          sessionId,
+        });
+      },
+    };
   }
 }

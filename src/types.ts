@@ -35,13 +35,6 @@ export interface LangfusePrompt {
   config?: Record<string, any>;
 }
 
-export interface ServiceRequest {
-  Requested_Service: string;
-  Guest_Information: string;
-  Preferred_Time: string;
-  Comments?: string;
-}
-
 export interface Env {
   // OpenAI
   OPENAI_API_KEY: string;

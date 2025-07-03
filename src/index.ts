@@ -1,5 +1,5 @@
-import { Env, ChatRequest } from "./types";
-import { ChatService } from "./services/chatService";
+import { Env, ChatRequest, ChatResponse } from "./types";
+import { DataCollectionTask } from "./tasks/dataCollectionTask";
 
 export default {
   async fetch(
@@ -37,15 +37,32 @@ export default {
         );
       }
 
-      // Initialize chat service
-      const chatService = new ChatService(env);
-
-      // Process the message
-      const response = await chatService.processMessage(
-        chatRequest.message,
-        chatRequest.sessionId,
-        []
+      // Initialize by collecting data from all services
+      const dataCollectionTask = new DataCollectionTask(env);
+      const collectedData = await dataCollectionTask.collectData(
+        chatRequest.sessionId
       );
+
+      // Process the message with collected data
+      const response: ChatResponse = {
+        message: {
+          content: {
+            result: [],
+          },
+        },
+        text: `Dziękuję za wiadomość! Zebrałem dane:
+- Prompty z Langfuse: ${
+          collectedData.prompts.guestService ? "✓" : "✗"
+        } guest-service, ${
+          collectedData.prompts.buttons ? "✓" : "✗"
+        } buttons, ${
+          collectedData.prompts.knowledgeBaseTool ? "✓" : "✗"
+        } knowledge-base-tool
+- Dane Excel: ${collectedData.excelData.length} znaków
+- Historia sesji: ${collectedData.sessionHistory.length} wiadomości
+
+Twoja wiadomość: ${chatRequest.message}`,
+      };
 
       // Return response
       return new Response(JSON.stringify(response), {
