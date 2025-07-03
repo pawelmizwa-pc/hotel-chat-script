@@ -4,6 +4,9 @@ import { GuestServiceTask } from "./tasks/guestServiceTask";
 import { ButtonsTask } from "./tasks/buttonsTask";
 import { EmailTask } from "./tasks/emailTask";
 import { MemoryService } from "./services/memory";
+import { LangfuseService } from "./services/langfuse";
+import { OpenAIService } from "./services/openaiService";
+import { GoogleSheets } from "./services/googleSheets";
 
 export default {
   async fetch(
@@ -41,17 +44,30 @@ export default {
         );
       }
 
+      // Initialize shared services
+      const langfuseService = new LangfuseService(env);
+      const openaiService = new OpenAIService(env);
+      const memoryService = new MemoryService(env);
+      const googleSheets = new GoogleSheets(env);
+
       // Initialize by collecting data from all services
-      const dataCollectionTask = new DataCollectionTask(env);
+      const dataCollectionTask = new DataCollectionTask(
+        langfuseService,
+        googleSheets,
+        memoryService
+      );
       const collectedData = await dataCollectionTask.collectData(
         chatRequest.sessionId
       );
+      console.log("collectedData", JSON.stringify(collectedData, null, 2));
 
-      // Initialize tasks
-      const guestServiceTask = new GuestServiceTask(env);
-      const buttonsTask = new ButtonsTask(env);
-      const emailTask = new EmailTask(env);
-      const memoryService = new MemoryService(env);
+      // Initialize tasks with shared services
+      const guestServiceTask = new GuestServiceTask(
+        langfuseService,
+        openaiService
+      );
+      const buttonsTask = new ButtonsTask(langfuseService, openaiService);
+      const emailTask = new EmailTask(langfuseService, openaiService);
 
       // 1st OpenAI call: user input + history + excel + guest-service prompt
       const firstResponse = await guestServiceTask.execute({
@@ -73,6 +89,7 @@ export default {
           buttonsPrompt: collectedData.prompts.buttons,
           knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
           sessionId: chatRequest.sessionId,
+          history: collectedData.sessionHistory,
         }),
         // 3rd OpenAI call: output from 1st + excel + knowledge-base-tool prompt + user input
         emailTask.execute({

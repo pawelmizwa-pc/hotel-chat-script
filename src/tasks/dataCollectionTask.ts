@@ -1,7 +1,7 @@
 import { LangfuseService } from "../services/langfuse";
 import { GoogleSheets } from "../services/googleSheets";
 import { MemoryService } from "../services/memory";
-import { Env, LangfusePrompt, SessionMemory } from "../types";
+import { LangfusePrompt, SessionMemory } from "../types";
 
 export interface DataCollectionResult {
   prompts: {
@@ -19,10 +19,14 @@ export class DataCollectionTask {
   private googleSheets: GoogleSheets;
   private memoryService: MemoryService;
 
-  constructor(env: Env) {
-    this.langfuseService = new LangfuseService(env);
-    this.googleSheets = new GoogleSheets(env);
-    this.memoryService = new MemoryService(env);
+  constructor(
+    langfuseService: LangfuseService,
+    googleSheets: GoogleSheets,
+    memoryService: MemoryService
+  ) {
+    this.langfuseService = langfuseService;
+    this.googleSheets = googleSheets;
+    this.memoryService = memoryService;
   }
 
   /**
