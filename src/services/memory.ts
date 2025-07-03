@@ -1,4 +1,4 @@
-import { Env, SessionMemory, ChatMessage } from "../types";
+import { Env, SessionMemory } from "../types";
 
 export class MemoryService {
   private kv: KVNamespace;
@@ -16,8 +16,9 @@ export class MemoryService {
   async getSessionMemory(sessionId: string): Promise<SessionMemory | null> {
     try {
       const key = this.getSessionKey(sessionId);
-      const data = await this.kv.get(key, "json");
-      return data as SessionMemory | null;
+      const data = await this.kv.get(key, "text");
+      if (!data) return null;
+      return JSON.parse(data) as SessionMemory;
     } catch (error) {
       console.error(`Error getting session memory for ${sessionId}:`, error);
       return null;
@@ -45,48 +46,5 @@ export class MemoryService {
       console.error(`Error saving session memory for ${sessionId}:`, error);
       throw error;
     }
-  }
-
-  async addMessage(sessionId: string, message: ChatMessage): Promise<void> {
-    let memory = await this.getSessionMemory(sessionId);
-
-    if (!memory) {
-      memory = {
-        messages: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    }
-
-    memory.messages.push({
-      ...message,
-      timestamp: Date.now(),
-    });
-
-    await this.saveSessionMemory(sessionId, memory);
-  }
-
-  async getConversationHistory(sessionId: string): Promise<ChatMessage[]> {
-    const memory = await this.getSessionMemory(sessionId);
-    return memory?.messages || [];
-  }
-
-  async clearSession(sessionId: string): Promise<void> {
-    try {
-      const key = this.getSessionKey(sessionId);
-      await this.kv.delete(key);
-    } catch (error) {
-      console.error(`Error clearing session ${sessionId}:`, error);
-      throw error;
-    }
-  }
-
-  formatMessagesForLangChain(
-    messages: ChatMessage[]
-  ): Array<{ role: string; content: string }> {
-    return messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
   }
 }

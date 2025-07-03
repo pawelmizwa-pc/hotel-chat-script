@@ -5,17 +5,25 @@ export interface ChatRequest {
 }
 
 export interface ChatResponse {
+  recipient: {
+    id: string;
+  };
+  messaging_type: "RESPONSE";
   message: {
-    content: {
-      result: QuickAction[];
+    attachment: {
+      type: "template";
+      payload: {
+        template_type: "button";
+        language: string;
+        text: string;
+        buttons: Array<{
+          type: "postback";
+          title: string;
+          payload: string;
+        }>;
+      };
     };
   };
-  text: string;
-}
-
-export interface QuickAction {
-  title: string;
-  payload: string;
 }
 
 export interface SessionMemory {

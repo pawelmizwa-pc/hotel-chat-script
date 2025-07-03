@@ -36,7 +36,11 @@ export class OpenAIService {
     model: string;
     finishReason: string | null;
   }> {
-    const { model = "gpt-4", temperature = 0.7, maxTokens = 1000 } = options;
+    const {
+      model = "gpt-4o-mini",
+      temperature = 0,
+      maxTokens = 1000,
+    } = options;
 
     // Convert ChatMessage[] to OpenAI format
     const openaiMessages = messages.map((msg) => ({

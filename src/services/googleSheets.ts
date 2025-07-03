@@ -389,36 +389,104 @@ export class GoogleSheets {
     }
   }
 
-  private searchInRows(rows: any[], query: string): string[] {
-    const queryLower = query.toLowerCase();
-    const results: string[] = [];
+  /**
+   * Collect markdown from every sheet in the spreadsheet
+   * @returns Promise<string> - All sheets formatted as markdown
+   */
+  async collectAllSheetsAsMarkdown(): Promise<string> {
+    try {
+      const doc = new GoogleSpreadsheet(this.documentId, {
+        apiKey: this.env.GOOGLE_SHEETS_API_KEY,
+      });
 
-    for (const row of rows) {
-      // Get all values from the row
-      const rowValues = Object.values(row.toObject());
-      const rowText = rowValues.join(" ").toLowerCase();
+      await doc.loadInfo();
 
-      if (rowText.includes(queryLower)) {
-        results.push(rowValues.join(" - "));
-      }
-    }
+      const markdownParts: any[] = [
+        { h1: doc.title },
+        {
+          blockquote: `Wszystkie dane z arkusza Google Sheets - ${doc.sheetCount} arkuszy`,
+        },
+        { hr: "" },
+      ];
 
-    // If no direct matches, try partial matches
-    if (results.length === 0) {
-      const queryWords = queryLower.split(" ");
-      for (const row of rows) {
-        const rowValues = Object.values(row.toObject());
-        const rowText = rowValues.join(" ").toLowerCase();
-        const matchCount = queryWords.filter((word) =>
-          rowText.includes(word)
-        ).length;
+      // Process all sheets
+      for (let i = 0; i < doc.sheetCount; i++) {
+        try {
+          const sheet = doc.sheetsByIndex[i];
+          if (!sheet) continue;
 
-        if (matchCount > 0) {
-          results.push(rowValues.join(" - "));
+          await sheet.loadHeaderRow();
+          const headers = sheet.headerValues;
+
+          if (!headers || headers.length === 0) {
+            markdownParts.push(
+              { h2: sheet.title },
+              { p: "Arkusz nie zawiera nagłówków." }
+            );
+            continue;
+          }
+
+          const rows = await sheet.getRows();
+
+          if (rows.length === 0) {
+            markdownParts.push(
+              { h2: sheet.title },
+              { p: "Arkusz nie zawiera danych." }
+            );
+            continue;
+          }
+
+          // Prepare table data
+          const tableRows = rows.map((row) => {
+            return headers.map((header) => {
+              const cellValue = row.get(header) || "";
+              return (
+                String(cellValue)
+                  .replace(/\n/g, " ")
+                  .replace(/\r/g, "")
+                  .replace(/\|/g, "\\|")
+                  .trim() || "-"
+              );
+            });
+          });
+
+          // Add sheet content
+          markdownParts.push(
+            { h2: sheet.title },
+            {
+              table: {
+                headers: headers,
+                rows: tableRows,
+              },
+            },
+            { hr: "" }
+          );
+        } catch (sheetError) {
+          console.error(`Error processing sheet ${i}:`, sheetError);
+          markdownParts.push(
+            { h2: `Arkusz ${i + 1}` },
+            {
+              blockquote: `Błąd podczas przetwarzania: ${
+                sheetError instanceof Error
+                  ? sheetError.message
+                  : String(sheetError)
+              }`,
+            }
+          );
         }
       }
-    }
 
-    return results.slice(0, 5); // Limit to top 5 results
+      return json2md(markdownParts);
+    } catch (error) {
+      console.error("Error collecting all sheets as markdown:", error);
+      return json2md([
+        { h1: "Error" },
+        {
+          blockquote: `Przepraszam, wystąpił błąd podczas odczytywania arkuszy: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+      ]);
+    }
   }
 }
