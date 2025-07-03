@@ -64,15 +64,18 @@ export class EmailTask {
       },
     ];
 
-    // Create OpenAI client with Langfuse prompt linking
+    // Create OpenAI client with Langfuse observability
     const baseOpenAI = this.openaiService.getClient();
 
-    // Use observeOpenAI wrapper
-    const openaiWithPrompt = observeOpenAI(baseOpenAI, {
-      generationName: "email-generation",
-      sessionId: input.sessionId,
-      userId: input.sessionId,
-    });
+    // Use our configured observeOpenAI wrapper
+    const openaiWithPrompt = this.langfuseService.createObservedOpenAI(
+      baseOpenAI,
+      {
+        generationName: "email-generation",
+        sessionId: input.sessionId,
+        userId: input.sessionId,
+      }
+    );
 
     // Call OpenAI - observeOpenAI automatically creates trace and generation
     const response = await openaiWithPrompt.chat.completions.create({
@@ -86,7 +89,6 @@ export class EmailTask {
     });
 
     // Finalize and send to Langfuse
-    await openaiWithPrompt.flushAsync();
     await this.langfuseService.flush();
 
     return {

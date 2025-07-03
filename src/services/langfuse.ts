@@ -6,11 +6,35 @@ export class LangfuseService {
   private langfuse: Langfuse;
 
   constructor(env: Env) {
+    // Set up global environment variables for observeOpenAI function
+    // In Cloudflare Workers, we need to make these available globally
+    if (typeof globalThis !== "undefined") {
+      globalThis.process = globalThis.process || {};
+      globalThis.process.env = globalThis.process.env || {};
+      globalThis.process.env.LANGFUSE_SECRET_KEY = env.LANGFUSE_SECRET_KEY;
+      globalThis.process.env.LANGFUSE_PUBLIC_KEY = env.LANGFUSE_PUBLIC_KEY;
+      globalThis.process.env.LANGFUSE_HOST = env.LANGFUSE_HOST;
+    }
+
     this.langfuse = new Langfuse({
       baseUrl: env.LANGFUSE_HOST,
       secretKey: env.LANGFUSE_SECRET_KEY,
       publicKey: env.LANGFUSE_PUBLIC_KEY,
     });
+  }
+
+  /**
+   * Create an observed OpenAI client using global observeOpenAI with proper config
+   */
+  createObservedOpenAI(
+    openaiClient: OpenAI,
+    config: {
+      generationName: string;
+      sessionId?: string;
+      userId?: string;
+    }
+  ): OpenAI {
+    return observeOpenAI(openaiClient, config);
   }
 
   /**

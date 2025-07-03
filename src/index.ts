@@ -59,7 +59,6 @@ export default {
       const collectedData = await dataCollectionTask.collectData(
         chatRequest.sessionId
       );
-      console.log("collectedData", JSON.stringify(collectedData, null, 2));
 
       // Initialize tasks with shared services
       const guestServiceTask = new GuestServiceTask(
@@ -89,7 +88,6 @@ export default {
           buttonsPrompt: collectedData.prompts.buttons,
           knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
           sessionId: chatRequest.sessionId,
-          history: collectedData.sessionHistory,
         }),
         // 3rd OpenAI call: output from 1st + excel + knowledge-base-tool prompt + user input
         emailTask.execute({
