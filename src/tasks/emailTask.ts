@@ -61,11 +61,13 @@ export class EmailTask {
         content: input.firstCallOutput,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages.map((msg: ChatMessage) => ({
-        role: msg.role,
-        content: msg.content,
-        timestamp: msg.timestamp,
-      })),
+      ...input.sessionHistory.messages
+        .map((msg: ChatMessage) => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        }))
+        .reverse(),
     ];
 
     // Create generation for this LLM call
