@@ -25,5 +25,4 @@ GOOGLE_SHEETS_DOCUMENT_ID = "1lx-s6rxPGn4IKgFQk7vrtO4nDH0diHE1dr04u8b6dx4"
 RESEND_FROM_EMAIL = "Hotel Guest Service <ai.agent@pragmaticcoders.com>"
 
 # Session
-CHAT_SESSIONS = "1142c6a3e16d49e29161c0cfad093766"
 CONTEXT_WINDOW_LENGTH = "15"
