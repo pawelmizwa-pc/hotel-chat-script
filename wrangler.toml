@@ -12,3 +12,18 @@ preview_id = "1142c6a3e16d49e29161c0cfad093766"
 [observability]
 enabled = true
 head_sampling_rate = 1 # optional. default = 1.
+
+[vars]
+# Langfuse
+LANGFUSE_HOST = "https://cloud.langfuse.com"
+LANGFUSE_PUBLIC_KEY = "pk-lf-2e97d260-a63c-45cb-89ac-2b66c085840c"
+
+# Google Sheets
+GOOGLE_SHEETS_DOCUMENT_ID = "1lx-s6rxPGn4IKgFQk7vrtO4nDH0diHE1dr04u8b6dx4"
+
+# Email
+RESEND_FROM_EMAIL = "Hotel Guest Service <ai.agent@pragmaticcoders.com>"
+
+# Session
+CHAT_SESSIONS = "1142c6a3e16d49e29161c0cfad093766"
+CONTEXT_WINDOW_LENGTH = "15"
