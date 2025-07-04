@@ -36,7 +36,6 @@ export class GuestServiceTask {
   async execute(input: GuestServiceTaskInput): Promise<GuestServiceTaskOutput> {
     // Prepare messages for OpenAI call
     const messages: ChatMessage[] = [
-      // System prompt from guest-service
       {
         role: "system",
         content:
@@ -44,7 +43,6 @@ export class GuestServiceTask {
           "You are a helpful hotel assistant.",
         timestamp: Date.now(),
       },
-      // Assistant messages (excel + history)
       {
         role: "system",
         content: createExcelMessage(
@@ -53,7 +51,6 @@ export class GuestServiceTask {
         ),
         timestamp: Date.now(),
       },
-      // User input
       {
         role: "user",
         content: input.userMessage,

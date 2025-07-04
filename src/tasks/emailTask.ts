@@ -1,6 +1,6 @@
 import { LangfuseService } from "../services/langfuse";
 import { OpenAIService } from "../services/openaiService";
-import { ChatMessage, LangfusePrompt } from "../types";
+import { ChatMessage, LangfusePrompt, SessionMemory } from "../types";
 import { createExcelMessage } from "../constants";
 import { LangfuseTraceClient } from "langfuse";
 
@@ -10,6 +10,7 @@ export interface EmailTaskInput {
   excelData: string;
   emailToolPrompt: LangfusePrompt | null;
   knowledgeBasePrompt: LangfusePrompt | null;
+  sessionHistory: SessionMemory;
   sessionId: string;
   trace?: LangfuseTraceClient; // Langfuse trace object
 }
@@ -36,16 +37,19 @@ export class EmailTask {
   async execute(input: EmailTaskInput): Promise<EmailTaskOutput> {
     // Prepare messages for OpenAI call
     const messages: ChatMessage[] = [
-      // System prompt from knowledge-base-tool
+      {
+        role: "user",
+        content: input.userMessage,
+        timestamp: Date.now(),
+      },
       {
         role: "system",
         content:
           input.emailToolPrompt?.prompt || "You are a helpful hotel assistant.",
         timestamp: Date.now(),
       },
-      // Assistant messages (excel + first call output)
       {
-        role: "assistant",
+        role: "system",
         content: createExcelMessage(
           input.knowledgeBasePrompt?.prompt || "",
           input.excelData
@@ -54,15 +58,14 @@ export class EmailTask {
       },
       {
         role: "assistant",
-        content: `This is first call output:\n${input.firstCallOutput}`,
+        content: input.firstCallOutput,
         timestamp: Date.now(),
       },
-      // User input
-      {
-        role: "user",
-        content: input.userMessage,
-        timestamp: Date.now(),
-      },
+      ...input.sessionHistory.messages.map((msg: ChatMessage) => ({
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+      })),
     ];
 
     // Create generation for this LLM call

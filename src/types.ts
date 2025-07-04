@@ -56,11 +56,14 @@ export interface Env {
   GOOGLE_SHEETS_API_KEY: string;
   GOOGLE_SHEETS_DOCUMENT_ID: string;
 
-  // Gmail
-  GMAIL_CLIENT_ID: string;
-  GMAIL_CLIENT_SECRET: string;
-  GMAIL_REFRESH_TOKEN: string;
-  GMAIL_ACCESS_TOKEN: string;
+  // Gmail SMTP
+  GMAIL_USER: string;
+  GMAIL_APP_PASSWORD: string;
+  GMAIL_FROM_NAME?: string;
+
+  // Resend
+  RESEND_API_KEY?: string;
+  RESEND_FROM_EMAIL?: string;
 
   // Email
   SERVICE_EMAIL_TO: string;

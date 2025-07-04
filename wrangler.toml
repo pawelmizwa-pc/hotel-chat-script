@@ -1,6 +1,7 @@
 name = "hotel-chat-worker"
 main = "src/index.ts"
 compatibility_date = "2024-10-25"
+compatibility_flags = ["nodejs_compat"]
 
 # KV namespace for session storage
 [[kv_namespaces]]

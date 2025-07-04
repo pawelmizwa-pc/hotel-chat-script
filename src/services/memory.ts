@@ -47,4 +47,33 @@ export class MemoryService {
       throw error;
     }
   }
+
+  async updateSessionWithConversation(
+    sessionId: string,
+    sessionMemory: SessionMemory,
+    userMessage: string,
+    assistantResponse: string
+  ): Promise<void> {
+    try {
+      // Add user message to memory
+      sessionMemory.messages.push({
+        role: "user",
+        content: userMessage,
+        timestamp: Date.now(),
+      });
+
+      // Add assistant response to memory
+      sessionMemory.messages.push({
+        role: "assistant",
+        content: assistantResponse,
+        timestamp: Date.now(),
+      });
+
+      // Save updated session memory
+      await this.saveSessionMemory(sessionId, sessionMemory);
+    } catch (error) {
+      console.error("Failed to update session with conversation:", error);
+      throw error;
+    }
+  }
 }
