@@ -41,7 +41,6 @@ export class ChatHandler {
       chatRequest.sessionId,
       trace
     );
-    console.log("collectedData", collectedData);
 
     // Initialize tasks with shared services
     const guestServiceTask = new GuestServiceTask(
@@ -64,9 +63,6 @@ export class ChatHandler {
       sessionId: chatRequest.sessionId,
       trace,
     });
-
-    console.log("firstResponse", firstResponse);
-    console.log("collectedData", collectedData);
 
     // 2nd & 3rd OpenAI calls: run in parallel using first call output
     const [secondResponse, thirdResponse] = await Promise.all([
@@ -94,7 +90,18 @@ export class ChatHandler {
     // Parse buttons from secondResponse
     const buttons = this.parseButtons(secondResponse.content);
 
-    const thirdResponseContent = JSON.parse(thirdResponse.content);
+    let thirdResponseContent;
+    try {
+      thirdResponseContent = JSON.parse(thirdResponse.content);
+    } catch (error) {
+      console.error("Failed to parse third response:", error);
+      thirdResponseContent = {
+        emailText: "",
+        duringEmailClarification: false,
+        shouldSendEmail: false,
+        clarificationText: "",
+      };
+    }
 
     if (thirdResponseContent.emailText) {
       try {
