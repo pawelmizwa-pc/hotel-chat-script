@@ -16,20 +16,6 @@ export CONTEXT_WINDOW_LENGTH="15"
 export SERVICE_EMAIL_TO="test@example.com"
 ```
 
-### Optional (for full functionality):
-
-```bash
-# Google Sheets (knowledge base will fall back gracefully if not set)
-export GOOGLE_SHEETS_CLIENT_EMAIL="your-service-account@project.iam.gserviceaccount.com"
-export GOOGLE_SHEETS_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nYour private key\n-----END PRIVATE KEY-----"
-export GOOGLE_SHEETS_DOCUMENT_ID="1lx-s6rxPGn4IKgFQk7vrtO4nDH0diHE1dr04u8b6dx4"
-
-# Gmail (service requests will fall back gracefully if not set)
-export GMAIL_CLIENT_ID="your-gmail-client-id"
-export GMAIL_CLIENT_SECRET="your-gmail-client-secret"
-export GMAIL_REFRESH_TOKEN="your-gmail-refresh-token"
-```
-
 ## Step 2: Set Up Local KV Storage
 
 ```bash
