@@ -6,8 +6,8 @@ compatibility_flags = ["nodejs_compat"]
 # KV namespace for session storage
 [[kv_namespaces]]
 binding = "CHAT_SESSIONS"
-id = "1142c6a3e16d49e29161c0cfad093766"
-preview_id = "1142c6a3e16d49e29161c0cfad093766"
+id = "90e1d327acd344a39fd5c575e4d6d949"
+preview_id = "90e1d327acd344a39fd5c575e4d6d949"
 
 [observability]
 enabled = true
