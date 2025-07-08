@@ -1,4 +1,4 @@
-# Local Development Setup for Hotel Smile Chat Agent
+# Local Development Setup for Hotel Chat Agent
 
 ## Step 1: Minimum Required Environment Variables
 

@@ -39,6 +39,7 @@ export class ChatHandler {
     );
     const collectedData = await dataCollectionTask.collectData(
       chatRequest.sessionId,
+      chatRequest.spreadSheetId,
       trace
     );
 

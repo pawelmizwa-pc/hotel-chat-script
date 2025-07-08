@@ -3,21 +3,21 @@ import json2md from "json2md";
 import { Env } from "../types";
 
 export class GoogleSheets {
-  private documentId: string;
   private env: Env;
 
   constructor(env: Env) {
     this.env = env;
-    this.documentId = env.GOOGLE_SHEETS_DOCUMENT_ID;
   }
 
   /**
    * Collect markdown from every sheet in the spreadsheet
+   * @param spreadSheetId - The ID of the Google Sheets document (optional, falls back to environment variable)
    * @returns Promise<string> - All sheets formatted as markdown
    */
-  async collectAllSheetsAsMarkdown(): Promise<string> {
+  async collectAllSheetsAsMarkdown(spreadSheetId?: string): Promise<string> {
     try {
-      const doc = new GoogleSpreadsheet(this.documentId, {
+      const documentId = spreadSheetId || this.env.GOOGLE_SHEETS_DOCUMENT_ID;
+      const doc = new GoogleSpreadsheet(documentId, {
         apiKey: this.env.GOOGLE_SHEETS_API_KEY,
       });
 

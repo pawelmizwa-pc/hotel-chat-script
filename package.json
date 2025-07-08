@@ -1,7 +1,7 @@
 {
   "name": "hotel-chat-worker",
   "version": "1.0.0",
-  "description": "Hotel Smile Chat Agent Cloudflare Worker",
+  "description": "Hotel Chat Agent Cloudflare Worker",
   "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",

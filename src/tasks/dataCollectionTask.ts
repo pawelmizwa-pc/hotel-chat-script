@@ -33,11 +33,13 @@ export class DataCollectionTask {
   /**
    * Collect data from all three services
    * @param sessionId The session ID to get history for
+   * @param spreadSheetId The ID of the Google Sheets document (optional)
    * @param trace Optional Langfuse trace object
    * @returns Promise<DataCollectionResult>
    */
   async collectData(
     sessionId: string,
+    spreadSheetId?: string,
     trace?: LangfuseTraceClient
   ): Promise<DataCollectionResult> {
     try {
@@ -82,7 +84,7 @@ export class DataCollectionTask {
         ),
         measurePromise(this.langfuseService.getPrompt("email"), "email-prompt"),
         measurePromise(
-          this.googleSheets.collectAllSheetsAsMarkdown(),
+          this.googleSheets.collectAllSheetsAsMarkdown(spreadSheetId),
           "excel-data"
         ),
         measurePromise(

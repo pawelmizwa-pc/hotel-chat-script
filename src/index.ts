@@ -88,7 +88,7 @@ export async function handleHealthCheck(): Promise<Response> {
     JSON.stringify({
       status: "healthy",
       timestamp: new Date().toISOString(),
-      service: "Hotel Smile Chat Agent",
+      service: "Hotel Chat Agent",
     }),
     {
       status: 200,
