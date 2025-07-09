@@ -81,7 +81,7 @@ export class ButtonsTask {
           {
             messages,
           },
-          "gpt-4o-mini"
+          "gpt-4.1-mini"
         )
       : null;
 
@@ -89,7 +89,7 @@ export class ButtonsTask {
     const response = await this.openaiService
       .getClient()
       .chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4.1-mini",
         messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,

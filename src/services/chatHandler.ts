@@ -120,7 +120,7 @@ export class ChatHandler {
           text: thirdResponseContent.emailText,
         });
         console.log(
-          "Email sent successfully to pawel.mizwa@pragmaticcoders.com"
+          "Email sent successfully to ai.agent.logs@pragmaticcoders.com"
         );
       } catch (error) {
         console.error("Failed to send email:", error);
