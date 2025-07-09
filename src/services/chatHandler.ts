@@ -185,7 +185,24 @@ export class ChatHandler {
     language: string;
   } {
     try {
-      const buttonsData = JSON.parse(content);
+      // Clean the content by removing markdown code blocks and extra whitespace
+      let cleanContent = content.trim();
+
+      // Remove markdown code blocks if present
+      const jsonMatch = cleanContent.match(
+        /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
+      );
+      if (jsonMatch) {
+        cleanContent = jsonMatch[1];
+      }
+
+      // Extract JSON if it's wrapped in other text
+      const jsonObjectMatch = cleanContent.match(/\{[\s\S]*\}/);
+      if (jsonObjectMatch) {
+        cleanContent = jsonObjectMatch[0];
+      }
+
+      const buttonsData = JSON.parse(cleanContent);
       if (buttonsData.result && Array.isArray(buttonsData.result)) {
         return {
           buttons: buttonsData.result.map((item: any) => ({
@@ -198,6 +215,7 @@ export class ChatHandler {
       }
     } catch (error) {
       console.warn("Failed to parse buttons from response:", error);
+      console.warn("Original content:", content);
     }
     return {
       buttons: [],
