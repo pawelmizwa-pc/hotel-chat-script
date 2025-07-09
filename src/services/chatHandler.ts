@@ -113,7 +113,7 @@ export class ChatHandler {
       };
     }
 
-    if (thirdResponseContent.emailText) {
+    if (thirdResponseContent.emailText && thirdResponseContent.shouldSendEmail) {
       try {
         await this.emailService.sendEmail({
           to: "ai.agent.logs@pragmaticcoders.com",

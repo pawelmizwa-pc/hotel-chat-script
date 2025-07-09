@@ -68,11 +68,13 @@ export class EmailTask {
       },
       {
         role: "assistant",
-        content: `This is all the information from the user: ${input.userMessage.concat(
+        content: `This is all the information from the user: \n Last message: ${input.userMessage.concat(
           "\n"
         )}${input.sessionHistory.messages
-          .map((msg: ChatMessage) => msg.content)
-          .join("\n")}`,
+          .map((msg: ChatMessage) => `\n${msg.role}: ${msg.content}`)
+          .join(
+            "\n"
+          )}. Based on this information, please assume if we should send email.`,
         timestamp: Date.now(),
       },
       {
