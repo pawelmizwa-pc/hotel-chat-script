@@ -3,6 +3,7 @@ export interface ChatRequest {
   message: string;
   language?: string;
   spreadSheetId?: string;
+  tenantId?: string;
 }
 
 export interface ChatResponse {
@@ -74,6 +75,7 @@ export interface Env {
 
   // KV Storage
   CHAT_SESSIONS: KVNamespace;
+  TENAT_CONFIG: KVNamespace;
 }
 
 export interface DynamicButton {

@@ -1,6 +1,7 @@
 import { LangfuseService } from "../services/langfuse";
 import { OpenAIService } from "../services/openaiService";
 import { ChatMessage, LangfusePrompt } from "../types";
+import { TenantConfig } from "./dataCollectionTask";
 import { createExcelMessage } from "../constants";
 import { LangfuseTraceClient } from "langfuse";
 
@@ -10,6 +11,7 @@ export interface ButtonsTaskInput {
   excelData: string;
   buttonsPrompt: LangfusePrompt | null;
   knowledgeBasePrompt: LangfusePrompt | null;
+  tenantConfig: TenantConfig | null;
   sessionId: string;
   trace?: LangfuseTraceClient; // Langfuse trace object
 }
@@ -43,6 +45,11 @@ export class ButtonsTask {
           input.buttonsPrompt?.prompt || "You are a helpful hotel assistant.",
         timestamp: Date.now(),
       },
+      {
+        role: "assistant",
+        content: input.tenantConfig?.["buttons-prompt-config"] || "",
+        timestamp: Date.now(),
+      },
       // Assistant messages (excel + first call output)
       {
         role: "assistant",
@@ -57,13 +64,14 @@ export class ButtonsTask {
         content: input.firstCallOutput,
         timestamp: Date.now(),
       },
-      // User input
-      {
-        role: "user",
-        content: input.userMessage,
-        timestamp: Date.now(),
-      },
     ];
+
+    // User input
+    messages.push({
+      role: "user",
+      content: input.userMessage,
+      timestamp: Date.now(),
+    });
 
     // Create generation for this LLM call
     const generation = input.trace
@@ -73,7 +81,7 @@ export class ButtonsTask {
           {
             messages,
           },
-          "gpt-4.1-mini"
+          "gpt-4o-mini"
         )
       : null;
 
@@ -81,7 +89,7 @@ export class ButtonsTask {
     const response = await this.openaiService
       .getClient()
       .chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o-mini",
         messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,

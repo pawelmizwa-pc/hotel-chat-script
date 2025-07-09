@@ -1,6 +1,7 @@
 import { LangfuseService } from "../services/langfuse";
 import { OpenAIService } from "../services/openaiService";
 import { ChatMessage, LangfusePrompt, SessionMemory } from "../types";
+import { TenantConfig } from "./dataCollectionTask";
 import { createExcelMessage } from "../constants";
 import { LangfuseTraceClient } from "langfuse";
 
@@ -10,6 +11,7 @@ export interface EmailTaskInput {
   excelData: string;
   emailToolPrompt: LangfusePrompt | null;
   knowledgeBasePrompt: LangfusePrompt | null;
+  tenantConfig: TenantConfig | null;
   sessionHistory: SessionMemory;
   sessionId: string;
   trace?: LangfuseTraceClient; // Langfuse trace object
@@ -51,6 +53,18 @@ export class EmailTask {
         ),
         timestamp: Date.now(),
       },
+    ];
+
+    // Add tenant config as assistant message if available
+    if (input.tenantConfig?.["email-prompt-config"]) {
+      messages.push({
+        role: "assistant",
+        content: input.tenantConfig["email-prompt-config"],
+        timestamp: Date.now(),
+      });
+    }
+
+    messages.push(
       {
         role: "user",
         content: input.userMessage,
@@ -60,8 +74,8 @@ export class EmailTask {
         role: msg.role,
         content: msg.content,
         timestamp: msg.timestamp,
-      })),
-    ];
+      }))
+    );
 
     // Create generation for this LLM call
     const generation = input.trace
@@ -69,7 +83,7 @@ export class EmailTask {
           input.trace,
           "email-task",
           { messages },
-          "gpt-4.1-mini"
+          "gpt-4o-mini"
         )
       : null;
 
@@ -77,7 +91,7 @@ export class EmailTask {
     const response = await this.openaiService
       .getClient()
       .chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o-mini",
         messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,

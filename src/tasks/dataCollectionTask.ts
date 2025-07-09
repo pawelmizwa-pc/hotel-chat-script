@@ -4,6 +4,13 @@ import { MemoryService } from "../services/memory";
 import { LangfusePrompt, SessionMemory } from "../types";
 import { LangfuseTraceClient } from "langfuse";
 
+export interface TenantConfig {
+  spreadsheetId: string;
+  "general-prompt-config": string;
+  "buttons-prompt-config": string;
+  "email-prompt-config": string;
+}
+
 export interface DataCollectionResult {
   prompts: {
     guestService: LangfusePrompt | null;
@@ -13,33 +20,58 @@ export interface DataCollectionResult {
   };
   excelData: string;
   sessionHistory: SessionMemory;
+  tenantConfig: TenantConfig | null;
 }
 
 export class DataCollectionTask {
   private langfuseService: LangfuseService;
   private googleSheets: GoogleSheets;
   private memoryService: MemoryService;
+  private tenantConfigKV: KVNamespace;
 
   constructor(
     langfuseService: LangfuseService,
     googleSheets: GoogleSheets,
-    memoryService: MemoryService
+    memoryService: MemoryService,
+    tenantConfigKV: KVNamespace
   ) {
     this.langfuseService = langfuseService;
     this.googleSheets = googleSheets;
     this.memoryService = memoryService;
+    this.tenantConfigKV = tenantConfigKV;
+  }
+
+  /**
+   * Fetch tenant configuration from KV store
+   * @param tenantId The tenant ID to fetch configuration for
+   * @returns Promise<TenantConfig | null>
+   */
+  private async fetchTenantConfig(
+    tenantId: string
+  ): Promise<TenantConfig | null> {
+    try {
+      const configString = await this.tenantConfigKV.get(tenantId);
+      if (!configString) {
+        console.warn(`No tenant config found for tenantId: ${tenantId}`);
+        return null;
+      }
+      return JSON.parse(configString) as TenantConfig;
+    } catch (error) {
+      console.error(`Error fetching tenant config for ${tenantId}:`, error);
+      return null;
+    }
   }
 
   /**
    * Collect data from all three services
    * @param sessionId The session ID to get history for
-   * @param spreadSheetId The ID of the Google Sheets document (optional)
+   * @param tenantId The tenant ID to fetch configuration for
    * @param trace Optional Langfuse trace object
    * @returns Promise<DataCollectionResult>
    */
   async collectData(
     sessionId: string,
-    spreadSheetId?: string,
+    tenantId: string,
     trace?: LangfuseTraceClient
   ): Promise<DataCollectionResult> {
     try {
@@ -47,8 +79,12 @@ export class DataCollectionTask {
       const span = trace
         ? this.langfuseService.createSpan(trace, "data-collection-task", {
             sessionId,
+            tenantId,
           })
         : null;
+
+      // Fetch tenant configuration first
+      const tenantConfig = await this.fetchTenantConfig(tenantId);
 
       // Helper function to measure promise execution time
       const measurePromise = async <T>(
@@ -71,7 +107,7 @@ export class DataCollectionTask {
         sessionHistoryResult,
       ] = await Promise.all([
         measurePromise(
-          this.langfuseService.getPrompt("guest-service"),
+          this.langfuseService.getPrompt("general"),
           "guest-service-prompt"
         ),
         measurePromise(
@@ -84,7 +120,9 @@ export class DataCollectionTask {
         ),
         measurePromise(this.langfuseService.getPrompt("email"), "email-prompt"),
         measurePromise(
-          this.googleSheets.collectAllSheetsAsMarkdown(spreadSheetId),
+          this.googleSheets.collectAllSheetsAsMarkdown(
+            tenantConfig?.spreadsheetId
+          ),
           "excel-data"
         ),
         measurePromise(
@@ -140,6 +178,7 @@ export class DataCollectionTask {
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
               },
+        tenantConfig,
       };
 
       // End span with timing metadata

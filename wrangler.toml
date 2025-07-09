@@ -9,6 +9,12 @@ binding = "CHAT_SESSIONS"
 id = "90e1d327acd344a39fd5c575e4d6d949"
 preview_id = "90e1d327acd344a39fd5c575e4d6d949"
 
+# KV namespace for tenant configuration
+[[kv_namespaces]]
+binding = "TENAT_CONFIG"
+id = "89798cccec8a4dc097e28c936da0846c"
+preview_id = "89798cccec8a4dc097e28c936da0846c"
+
 [observability]
 enabled = true
 head_sampling_rate = 1 # optional. default = 1.
@@ -16,7 +22,7 @@ head_sampling_rate = 1 # optional. default = 1.
 [vars]
 # Langfuse
 LANGFUSE_HOST = "https://cloud.langfuse.com"
-LANGFUSE_PUBLIC_KEY = "pk-lf-2e97d260-a63c-45cb-89ac-2b66c085840c"
+LANGFUSE_PUBLIC_KEY = "pk-lf-affdb403-f018-49f5-86ba-26fb4217d46f"
 
 # Google Sheets
 GOOGLE_SHEETS_DOCUMENT_ID = "1lx-s6rxPGn4IKgFQk7vrtO4nDH0diHE1dr04u8b6dx4"

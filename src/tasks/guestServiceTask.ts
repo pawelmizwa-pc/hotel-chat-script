@@ -1,6 +1,7 @@
 import { LangfuseService } from "../services/langfuse";
 import { OpenAIService } from "../services/openaiService";
 import { ChatMessage, SessionMemory, LangfusePrompt } from "../types";
+import { TenantConfig } from "./dataCollectionTask";
 import { createExcelMessage } from "../constants";
 import { LangfuseTraceClient } from "langfuse";
 
@@ -10,6 +11,7 @@ export interface GuestServiceTaskInput {
   excelData: string;
   guestServicePrompt: LangfusePrompt | null;
   knowledgeBasePrompt: LangfusePrompt | null;
+  tenantConfig: TenantConfig | null;
   sessionId: string;
   trace?: LangfuseTraceClient; // Langfuse trace object
 }
@@ -51,13 +53,25 @@ export class GuestServiceTask {
         ),
         timestamp: Date.now(),
       },
+    ];
+
+    // Add tenant config as assistant message if available
+    if (input.tenantConfig?.["general-prompt-config"]) {
+      messages.push({
+        role: "assistant",
+        content: input.tenantConfig["general-prompt-config"],
+        timestamp: Date.now(),
+      });
+    }
+
+    messages.push(
       {
         role: "user",
         content: input.userMessage,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages,
-    ];
+      ...input.sessionHistory.messages
+    );
 
     // Create generation for this LLM call
     const generation = input.trace

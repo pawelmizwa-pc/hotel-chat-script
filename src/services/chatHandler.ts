@@ -15,8 +15,10 @@ export class ChatHandler {
   private memoryService: MemoryService;
   private googleSheets: GoogleSheets;
   private emailService: EmailService;
+  private env: Env;
 
   constructor(env: Env) {
+    this.env = env;
     this.langfuseService = new LangfuseService(env);
     this.openaiService = new OpenAIService(env);
     this.memoryService = new MemoryService(env);
@@ -35,11 +37,12 @@ export class ChatHandler {
     const dataCollectionTask = new DataCollectionTask(
       this.langfuseService,
       this.googleSheets,
-      this.memoryService
+      this.memoryService,
+      this.env.TENAT_CONFIG
     );
     const collectedData = await dataCollectionTask.collectData(
       chatRequest.sessionId,
-      chatRequest.spreadSheetId,
+      chatRequest.tenantId || "default",
       trace
     );
 
@@ -61,6 +64,7 @@ export class ChatHandler {
       excelData: collectedData.excelData,
       guestServicePrompt: collectedData.prompts.guestService,
       knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
+      tenantConfig: collectedData.tenantConfig,
       sessionId: chatRequest.sessionId,
       trace,
     });
@@ -73,6 +77,7 @@ export class ChatHandler {
         excelData: collectedData.excelData,
         buttonsPrompt: collectedData.prompts.buttons,
         knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
+        tenantConfig: collectedData.tenantConfig,
         sessionId: chatRequest.sessionId,
         trace,
       }),
@@ -82,6 +87,7 @@ export class ChatHandler {
         excelData: collectedData.excelData,
         emailToolPrompt: collectedData.prompts.emailTool,
         knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
+        tenantConfig: collectedData.tenantConfig,
         sessionHistory: collectedData.sessionHistory,
         sessionId: chatRequest.sessionId,
         trace,
@@ -89,7 +95,9 @@ export class ChatHandler {
     ]);
 
     // Parse buttons from secondResponse
-    const buttons = this.parseButtons(secondResponse.content);
+    const buttonsData = this.parseButtons(secondResponse.content);
+    const buttons = buttonsData.buttons;
+    const detectedLanguage = buttonsData.language;
 
     let thirdResponseContent;
     try {
@@ -107,8 +115,8 @@ export class ChatHandler {
     if (thirdResponseContent.emailText) {
       try {
         await this.emailService.sendEmail({
-          to: "pawel.mizwa@pragmaticcoders.com",
-          subject: `Hotel Guest Request`,
+          to: "ai.agent.logs@pragmaticcoders.com",
+          subject: `Hotel Guest Test Request - Language: ${detectedLanguage} - Tenant: ${chatRequest.tenantId}`,
           text: thirdResponseContent.emailText,
         });
         console.log(
@@ -131,7 +139,7 @@ export class ChatHandler {
           type: "template",
           payload: {
             template_type: "button",
-            language: chatRequest.language || "en",
+            language: detectedLanguage,
             text: thirdResponseContent.duringEmailClarification
               ? thirdResponseContent.clarificationText
               : firstResponse.content,
@@ -172,21 +180,28 @@ export class ChatHandler {
     return response;
   }
 
-  private parseButtons(
-    content: string
-  ): Array<{ type: "postback"; title: string; payload: string }> {
+  private parseButtons(content: string): {
+    buttons: Array<{ type: "postback"; title: string; payload: string }>;
+    language: string;
+  } {
     try {
       const buttonsData = JSON.parse(content);
       if (buttonsData.result && Array.isArray(buttonsData.result)) {
-        return buttonsData.result.map((item: any) => ({
-          type: "postback" as const,
-          title: item.title,
-          payload: item.payload,
-        }));
+        return {
+          buttons: buttonsData.result.map((item: any) => ({
+            type: "postback" as const,
+            title: item.title,
+            payload: item.payload,
+          })),
+          language: buttonsData.language || "en",
+        };
       }
     } catch (error) {
       console.warn("Failed to parse buttons from response:", error);
     }
-    return [];
+    return {
+      buttons: [],
+      language: "en",
+    };
   }
 }
