@@ -67,6 +67,7 @@ export class GoogleSheets {
       console.error("Error collecting all sheets as markdown:", error);
       return json2md([
         { h1: "Error" },
+        { p: "Spreadsheet ID: " + spreadSheetId },
         {
           blockquote: `Przepraszam, wystąpił błąd podczas odczytywania arkuszy: ${
             error instanceof Error ? error.message : String(error)
