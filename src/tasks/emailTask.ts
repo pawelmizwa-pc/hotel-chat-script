@@ -67,6 +67,15 @@ export class EmailTask {
         timestamp: Date.now(),
       },
       {
+        role: "assistant",
+        content: `This is all the information from the user: ${input.userMessage.concat(
+          "\n"
+        )}${input.sessionHistory.messages
+          .map((msg: ChatMessage) => msg.content)
+          .join("\n")}`,
+        timestamp: Date.now(),
+      },
+      {
         role: "user",
         content: input.userMessage,
         timestamp: Date.now(),
@@ -77,7 +86,6 @@ export class EmailTask {
           content: msg.content,
           timestamp: msg.timestamp,
         }))
-        .filter((msg: ChatMessage) => msg.role === "user")
         .reverse()
     );
 
