@@ -46,6 +46,11 @@ export class GuestServiceTask {
         timestamp: Date.now(),
       },
       {
+        role: "assistant",
+        content: input.tenantConfig?.["general-prompt-config"] || "",
+        timestamp: Date.now(),
+      },
+      {
         role: "system",
         content: createExcelMessage(
           input.knowledgeBasePrompt?.prompt || "",
@@ -55,22 +60,13 @@ export class GuestServiceTask {
       },
     ];
 
-    // Add tenant config as assistant message if available
-    if (input.tenantConfig?.["general-prompt-config"]) {
-      messages.push({
-        role: "assistant",
-        content: input.tenantConfig["general-prompt-config"],
-        timestamp: Date.now(),
-      });
-    }
-
     messages.push(
       {
         role: "user",
         content: input.userMessage,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages
+      ...input.sessionHistory.messages.reverse()
     );
 
     // Create generation for this LLM call

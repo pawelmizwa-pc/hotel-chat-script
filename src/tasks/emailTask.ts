@@ -46,6 +46,11 @@ export class EmailTask {
         timestamp: Date.now(),
       },
       {
+        role: "assistant",
+        content: input.tenantConfig?.["email-prompt-config"] || "",
+        timestamp: Date.now(),
+      },
+      {
         role: "system",
         content: createExcelMessage(
           input.knowledgeBasePrompt?.prompt || "",
@@ -55,26 +60,20 @@ export class EmailTask {
       },
     ];
 
-    // Add tenant config as assistant message if available
-    if (input.tenantConfig?.["email-prompt-config"]) {
-      messages.push({
-        role: "assistant",
-        content: input.tenantConfig["email-prompt-config"],
-        timestamp: Date.now(),
-      });
-    }
-
     messages.push(
       {
         role: "user",
         content: input.userMessage,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages.map((msg: ChatMessage) => ({
-        role: msg.role,
-        content: msg.content,
-        timestamp: msg.timestamp,
-      }))
+      ...input.sessionHistory.messages
+        .map((msg: ChatMessage) => ({
+          role: msg.role,
+          content: msg.content,
+          timestamp: msg.timestamp,
+        }))
+        .filter((msg: ChatMessage) => msg.role === "user")
+        .reverse()
     );
 
     // Create generation for this LLM call
