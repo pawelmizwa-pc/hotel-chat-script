@@ -62,6 +62,11 @@ export class EmailTask {
 
     messages.push(
       {
+        role: "assistant",
+        content: `This is the last message from the user: ${input.userMessage}. Based on this message, please assume if user is still during email clarification.`,
+        timestamp: Date.now(),
+      },
+      {
         role: "user",
         content: input.userMessage,
         timestamp: Date.now(),
