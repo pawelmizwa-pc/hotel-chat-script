@@ -62,11 +62,18 @@ export class GuestServiceTask {
 
     messages.push(
       {
+        role: "assistant",
+        content: `This is the last message from the user: ${input.userMessage}. Based on this message, please assume if user is still during email clarification.`,
+        timestamp: Date.now(),
+      },
+      {
         role: "user",
         content: input.userMessage,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages.reverse()
+      ...input.sessionHistory.messages
+        .filter((msg) => msg.role === "user")
+        .reverse()
     );
 
     // Create generation for this LLM call
