@@ -23,22 +23,32 @@ export interface DataCollectionResult {
   tenantConfig: TenantConfig | null;
 }
 
+interface CachedExcelData {
+  data: string;
+  timestamp: number;
+  tenantId: string;
+}
+
 export class DataCollectionTask {
   private langfuseService: LangfuseService;
   private googleSheets: GoogleSheets;
   private memoryService: MemoryService;
   private tenantConfigKV: KVNamespace;
+  private tenantKnowledgeCache: KVNamespace;
+  private readonly CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour in milliseconds
 
   constructor(
     langfuseService: LangfuseService,
     googleSheets: GoogleSheets,
     memoryService: MemoryService,
-    tenantConfigKV: KVNamespace
+    tenantConfigKV: KVNamespace,
+    tenantKnowledgeCache: KVNamespace
   ) {
     this.langfuseService = langfuseService;
     this.googleSheets = googleSheets;
     this.memoryService = memoryService;
     this.tenantConfigKV = tenantConfigKV;
+    this.tenantKnowledgeCache = tenantKnowledgeCache;
   }
 
   /**
@@ -59,6 +69,74 @@ export class DataCollectionTask {
     } catch (error) {
       console.error(`Error fetching tenant config for ${tenantId}:`, error);
       return null;
+    }
+  }
+
+  /**
+   * Generate cache key for Excel data
+   * @param tenantId The tenant ID
+   * @returns string Cache key
+   */
+  private getCacheKey(tenantId: string): string {
+    return `excel-data:${tenantId}`;
+  }
+
+  /**
+   * Get cached Excel data if not expired
+   * @param tenantId The tenant ID
+   * @returns Promise<string | null> Cached data or null if expired/not found
+   */
+  private async getCachedExcelData(tenantId: string): Promise<string | null> {
+    try {
+      const cacheKey = this.getCacheKey(tenantId);
+      const cachedDataString = await this.tenantKnowledgeCache.get(cacheKey);
+
+      if (!cachedDataString) {
+        return null;
+      }
+
+      const cachedData: CachedExcelData = JSON.parse(cachedDataString);
+      const now = Date.now();
+
+      // Check if cache is expired
+      if (now - cachedData.timestamp > this.CACHE_EXPIRY_MS) {
+        console.log(`Cache expired for tenant: ${tenantId}`);
+        // Optionally delete expired cache
+        await this.tenantKnowledgeCache.delete(cacheKey);
+        return null;
+      }
+
+      console.log(`Cache hit for tenant: ${tenantId}`);
+      return cachedData.data;
+    } catch (error) {
+      console.error(
+        `Error retrieving cached Excel data for ${tenantId}:`,
+        error
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Cache Excel data with timestamp
+   * @param tenantId The tenant ID
+   * @param data The Excel markdown data to cache
+   * @returns Promise<void>
+   */
+  private async cacheExcelData(tenantId: string, data: string): Promise<void> {
+    try {
+      const cacheKey = this.getCacheKey(tenantId);
+      const cachedData: CachedExcelData = {
+        data,
+        timestamp: Date.now(),
+        tenantId,
+      };
+
+      await this.tenantKnowledgeCache.put(cacheKey, JSON.stringify(cachedData));
+      console.log(`Cached Excel data for tenant: ${tenantId}`);
+    } catch (error) {
+      console.error(`Error caching Excel data for ${tenantId}:`, error);
+      // Don't throw error, just log it - caching failure shouldn't break the flow
     }
   }
 
@@ -97,6 +175,27 @@ export class DataCollectionTask {
         return { result: result[0], time: (end - start) / 1000 }; // Convert to seconds
       };
 
+      // Get Excel data with caching
+      const getExcelDataWithCache = async (): Promise<string> => {
+        // Try to get cached data first
+        const cachedData = await this.getCachedExcelData(tenantId);
+        if (cachedData) {
+          return cachedData;
+        }
+
+        // Cache miss or expired, fetch from Google Sheets
+        console.log(
+          `Cache miss for tenant: ${tenantId}, fetching from Google Sheets`
+        );
+        const freshData = await this.googleSheets.collectAllSheetsAsMarkdown(
+          tenantConfig?.spreadsheetId
+        );
+
+        // Cache the fresh data
+        await this.cacheExcelData(tenantId, freshData);
+        return freshData;
+      };
+
       // Collect all data in parallel with timing
       const [
         guestServiceResult,
@@ -119,12 +218,7 @@ export class DataCollectionTask {
           "knowledge-base-tool-prompt"
         ),
         measurePromise(this.langfuseService.getPrompt("email"), "email-prompt"),
-        measurePromise(
-          this.googleSheets.collectAllSheetsAsMarkdown(
-            tenantConfig?.spreadsheetId
-          ),
-          "excel-data"
-        ),
+        measurePromise(getExcelDataWithCache(), "excel-data"),
         measurePromise(
           this.memoryService.getSessionMemory(sessionId),
           "session-history"

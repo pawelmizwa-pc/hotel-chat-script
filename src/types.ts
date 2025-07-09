@@ -76,6 +76,7 @@ export interface Env {
   // KV Storage
   CHAT_SESSIONS: KVNamespace;
   TENAT_CONFIG: KVNamespace;
+  TENAT_KNOWLEDGE_CACHE: KVNamespace;
 }
 
 export interface DynamicButton {

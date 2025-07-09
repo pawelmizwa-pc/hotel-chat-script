@@ -15,6 +15,12 @@ binding = "TENAT_CONFIG"
 id = "89798cccec8a4dc097e28c936da0846c"
 preview_id = "89798cccec8a4dc097e28c936da0846c"
 
+# KV namespace for tenant knowledge cache
+[[kv_namespaces]]
+binding = "TENAT_KNOWLEDGE_CACHE"
+id = "c20c6cd23a88476cb4ea38e2257c78a7"
+preview_id = "c20c6cd23a88476cb4ea38e2257c78a7"
+
 [observability]
 enabled = true
 head_sampling_rate = 1 # optional. default = 1.

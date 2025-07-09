@@ -38,7 +38,8 @@ export class ChatHandler {
       this.langfuseService,
       this.googleSheets,
       this.memoryService,
-      this.env.TENAT_CONFIG
+      this.env.TENAT_CONFIG,
+      this.env.TENAT_KNOWLEDGE_CACHE
     );
     const collectedData = await dataCollectionTask.collectData(
       chatRequest.sessionId,
