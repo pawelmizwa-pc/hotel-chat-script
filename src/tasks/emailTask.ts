@@ -115,7 +115,7 @@ export class EmailTask {
           input.trace,
           "email-task",
           { messages },
-          "gpt-4.1-mini"
+          "gpt-4.1"
         )
       : null;
 
@@ -123,13 +123,13 @@ export class EmailTask {
     const response = await this.openaiService
       .getClient()
       .chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4.1",
         messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
           timestamp: msg.timestamp,
         })),
-        temperature: 0.3,
+        temperature: 0.5,
         max_tokens: 1000,
       });
 
