@@ -11,7 +11,7 @@ export interface EmailTaskInput {
   firstCallOutput: string;
   excelData: string;
   emailToolPrompt: LangfusePrompt | null;
-  knowledgeBasePrompt: LangfusePrompt | null;
+  excelConfig: string | null;
   tenantConfig: TenantConfig | null;
   sessionHistory: SessionMemory;
   sessionId: string;
@@ -57,7 +57,28 @@ export class EmailTask {
     clarificationText: string;
   } {
     try {
-      const parsedContent = JSON.parse(content);
+      // Clean up markdown formatting from AI response
+      let cleanContent = content.trim();
+
+      // Remove markdown code block formatting
+      if (
+        cleanContent.startsWith("```json\n") ||
+        cleanContent.startsWith("```\n")
+      ) {
+        cleanContent = cleanContent
+          .replace(/^```(?:json)?\n/, "")
+          .replace(/\n```$/, "");
+      }
+
+      // Remove "json" prefix if present
+      if (cleanContent.startsWith("json\n")) {
+        cleanContent = cleanContent.replace(/^json\n/, "");
+      }
+
+      // Remove any remaining backticks
+      cleanContent = cleanContent.replace(/^`+|`+$/g, "");
+
+      const parsedContent = JSON.parse(cleanContent);
       return {
         emailText: parsedContent.emailText || "",
         duringEmailClarification:
@@ -67,6 +88,7 @@ export class EmailTask {
       };
     } catch (error) {
       console.error("Failed to parse email response:", error);
+      console.error("Original content:", content);
       return {
         emailText: "",
         duringEmailClarification: false,
@@ -93,7 +115,7 @@ export class EmailTask {
       {
         role: "system",
         content: createExcelMessage(
-          input.knowledgeBasePrompt?.prompt || "",
+          input.excelConfig || "",
           input.excelData
         ),
         timestamp: Date.now(),
@@ -115,7 +137,7 @@ export class EmailTask {
           input.trace,
           "email-task",
           { messages },
-          "gpt-4.1"
+          "o4-mini"
         )
       : null;
 
@@ -123,7 +145,7 @@ export class EmailTask {
     const response = await this.openaiService
       .getClient()
       .chat.completions.create({
-        model: "gpt-4.1",
+        model: "o4-mini",
         messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,

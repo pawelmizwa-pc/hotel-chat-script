@@ -9,13 +9,13 @@ export interface TenantConfig {
   "general-prompt-config": string;
   "buttons-prompt-config": string;
   "email-prompt-config": string;
+  "excel-config": string;
 }
 
 export interface DataCollectionResult {
   prompts: {
     guestService: LangfusePrompt | null;
     buttons: LangfusePrompt | null;
-    knowledgeBaseTool: LangfusePrompt | null;
     emailTool: LangfusePrompt | null;
   };
   excelData: string;
@@ -200,7 +200,6 @@ export class DataCollectionTask {
       const [
         guestServiceResult,
         buttonsResult,
-        knowledgeBaseToolResult,
         emailToolResult,
         excelDataResult,
         sessionHistoryResult,
@@ -213,10 +212,6 @@ export class DataCollectionTask {
           this.langfuseService.getPrompt("buttons"),
           "buttons-prompt"
         ),
-        measurePromise(
-          this.langfuseService.getPrompt("excel"),
-          "knowledge-base-tool-prompt"
-        ),
         measurePromise(this.langfuseService.getPrompt("email"), "email-prompt"),
         measurePromise(getExcelDataWithCache(), "excel-data"),
         measurePromise(
@@ -228,7 +223,6 @@ export class DataCollectionTask {
       // Extract results and times
       const guestServicePrompt = guestServiceResult.result;
       const buttonsPrompt = buttonsResult.result;
-      const knowledgeBaseToolPrompt = knowledgeBaseToolResult.result;
       const emailToolPrompt = emailToolResult.result;
       const excelData = excelDataResult.result;
       const sessionHistory = sessionHistoryResult.result;
@@ -237,7 +231,6 @@ export class DataCollectionTask {
       const timingMetadata = {
         guestServicePromptTime: guestServiceResult.time,
         buttonsPromptTime: buttonsResult.time,
-        knowledgeBaseToolPromptTime: knowledgeBaseToolResult.time,
         emailPromptTime: emailToolResult.time,
         excelDataTime: excelDataResult.time,
         sessionHistoryTime: sessionHistoryResult.time,
@@ -251,10 +244,6 @@ export class DataCollectionTask {
               : null,
           buttons:
             buttonsPrompt.status === "fulfilled" ? buttonsPrompt.value : null,
-          knowledgeBaseTool:
-            knowledgeBaseToolPrompt.status === "fulfilled"
-              ? knowledgeBaseToolPrompt.value
-              : null,
           emailTool:
             emailToolPrompt.status === "fulfilled"
               ? emailToolPrompt.value

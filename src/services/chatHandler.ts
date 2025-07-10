@@ -57,57 +57,61 @@ export class ChatHandler {
       this.openaiService
     );
     const emailTask = new EmailTask(
-      this.langfuseService, 
+      this.langfuseService,
       this.openaiService,
       this.emailService
     );
 
-    // 1st OpenAI call: user input + history + excel + guest-service prompt
-    const firstResponse = await guestServiceTask.execute({
-      userMessage: chatRequest.message,
-      sessionHistory: collectedData.sessionHistory,
-      excelData: collectedData.excelData,
-      guestServicePrompt: collectedData.prompts.guestService,
-      knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
-      tenantConfig: collectedData.tenantConfig,
-      sessionId: chatRequest.sessionId,
-      trace,
-    });
-
-    // 2nd OpenAI call: buttons task
-    const secondResponse = await buttonsTask.execute({
-      userMessage: chatRequest.message,
-      firstCallOutput: firstResponse.content,
-      excelData: collectedData.excelData,
-      buttonsPrompt: collectedData.prompts.buttons,
-      knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
-      tenantConfig: collectedData.tenantConfig,
-      sessionId: chatRequest.sessionId,
-      trace,
-    });
+    // Run guestServiceTask and buttonsTask in parallel (without firstCallOutput dependency)
+    const [firstResponse, secondResponse] = await Promise.all([
+      guestServiceTask.execute({
+        userMessage: chatRequest.message,
+        sessionHistory: collectedData.sessionHistory,
+        excelData: collectedData.excelData,
+        guestServicePrompt: collectedData.prompts.guestService,
+        excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
+        tenantConfig: collectedData.tenantConfig,
+        sessionId: chatRequest.sessionId,
+        trace,
+      }),
+      buttonsTask.execute({
+        userMessage: chatRequest.message,
+        // No firstCallOutput dependency
+        excelData: collectedData.excelData,
+        buttonsPrompt: collectedData.prompts.buttons,
+        excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
+        tenantConfig: collectedData.tenantConfig,
+        sessionId: chatRequest.sessionId,
+        trace,
+      }),
+    ]);
 
     // Use parsed buttons from secondResponse
     const buttons = secondResponse.buttons;
     const detectedLanguage = secondResponse.language;
 
-    // 3rd OpenAI call: email task with detected language
-    const thirdResponse = await emailTask.execute({
-      userMessage: chatRequest.message,
-      firstCallOutput: firstResponse.content,
-      excelData: collectedData.excelData,
-      emailToolPrompt: collectedData.prompts.emailTool,
-      knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
-      tenantConfig: collectedData.tenantConfig,
-      sessionHistory: collectedData.sessionHistory,
-      sessionId: chatRequest.sessionId,
-      tenantId: chatRequest.tenantId,
-      detectedLanguage: detectedLanguage,
-      trace,
-    });
+    // Conditionally run email task only when isDuringServiceRequest is true
+    let thirdResponse = null;
+    if (firstResponse.isDuringServiceRequest) {
+      thirdResponse = await emailTask.execute({
+        userMessage: chatRequest.message,
+        firstCallOutput: firstResponse.content,
+        excelData: collectedData.excelData,
+        emailToolPrompt: collectedData.prompts.emailTool,
+        excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
+        tenantConfig: collectedData.tenantConfig,
+        sessionHistory: collectedData.sessionHistory,
+        sessionId: chatRequest.sessionId,
+        tenantId: chatRequest.tenantId,
+        detectedLanguage: detectedLanguage,
+        trace,
+      });
+    }
 
-    const responseText = thirdResponse.duringEmailClarification
+    // Use the parsed text from guest service response, or clarification text if email task was executed
+    const responseText = thirdResponse?.duringEmailClarification
       ? thirdResponse.clarificationText
-      : firstResponse.content;
+      : firstResponse.text;
 
     // Create the response structure
     const response: ChatResponse = {
@@ -148,7 +152,7 @@ export class ChatHandler {
         taskBreakdown: {
           guestServiceTask: firstResponse.usage,
           buttonsTask: secondResponse.usage,
-          emailTask: thirdResponse.usage,
+          emailTask: thirdResponse?.usage,
         },
       },
     });

@@ -7,10 +7,10 @@ import { LangfuseTraceClient } from "langfuse";
 
 export interface ButtonsTaskInput {
   userMessage: string;
-  firstCallOutput: string;
+  firstCallOutput?: string; // Make this optional
   excelData: string;
   buttonsPrompt: LangfusePrompt | null;
-  knowledgeBasePrompt: LangfusePrompt | null;
+  excelConfig: string | null;
   tenantConfig: TenantConfig | null;
   sessionId: string;
   trace?: LangfuseTraceClient; // Langfuse trace object
@@ -95,21 +95,25 @@ export class ButtonsTask {
         content: input.tenantConfig?.["buttons-prompt-config"] || "",
         timestamp: Date.now(),
       },
-      // Assistant messages (excel + first call output)
+      // Assistant messages (excel data)
       {
         role: "assistant",
         content: createExcelMessage(
-          input.knowledgeBasePrompt?.prompt || "",
+          input.excelConfig || "",
           input.excelData
         ),
         timestamp: Date.now(),
       },
-      {
+    ];
+
+    // Only include firstCallOutput if it's provided
+    if (input.firstCallOutput) {
+      messages.push({
         role: "assistant",
         content: input.firstCallOutput,
         timestamp: Date.now(),
-      },
-    ];
+      });
+    }
 
     // User input
     messages.push({
