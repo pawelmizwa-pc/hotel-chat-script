@@ -102,6 +102,12 @@ export class EmailTask {
     // Prepare messages for OpenAI call
     const messages: ChatMessage[] = [
       {
+        role: "user",
+        content: input.userMessage,
+        timestamp: Date.now(),
+      },
+      ...input.sessionHistory.messages.reverse(),
+      {
         role: "system",
         content:
           input.emailToolPrompt?.prompt || "You are a helpful hotel assistant.",
@@ -117,16 +123,19 @@ export class EmailTask {
         content: createExcelMessage(input.excelConfig || "", input.excelData),
         timestamp: Date.now(),
       },
-    ];
-
-    messages.push(
       {
-        role: "user",
-        content: input.userMessage,
+        role: "assistant",
+        content: `User provided the following information: ${
+          input.userMessage
+        }\n${input.sessionHistory.messages
+          .filter((msg) => msg.role === "user")
+          .map((msg) => msg.content)
+          .join("\n")}`,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages.reverse()
-    );
+    ];
+
+    messages.push();
 
     // Create generation for this LLM call
     const generation = input.trace
