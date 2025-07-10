@@ -126,7 +126,7 @@ export class EmailTask {
       },
       {
         role: "assistant",
-        content: `User provided the following information: ${
+        content: `User provided the following information: \n${
           input.userMessage
         }\n${input.sessionHistory.messages
           .filter((msg) => msg.role === "user")
