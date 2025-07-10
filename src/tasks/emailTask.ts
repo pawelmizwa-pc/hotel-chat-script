@@ -1,5 +1,6 @@
 import { LangfuseService } from "../services/langfuse";
 import { OpenAIService } from "../services/openaiService";
+import { EmailService } from "../services/emailService";
 import { ChatMessage, LangfusePrompt, SessionMemory } from "../types";
 import { TenantConfig } from "./dataCollectionTask";
 import { createExcelMessage } from "../constants";
@@ -14,11 +15,18 @@ export interface EmailTaskInput {
   tenantConfig: TenantConfig | null;
   sessionHistory: SessionMemory;
   sessionId: string;
+  tenantId?: string;
+  detectedLanguage: string;
   trace?: LangfuseTraceClient; // Langfuse trace object
 }
 
 export interface EmailTaskOutput {
   content: string;
+  emailText: string;
+  duringEmailClarification: boolean;
+  shouldSendEmail: boolean;
+  clarificationText: string;
+  emailSent: boolean;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -30,10 +38,42 @@ export interface EmailTaskOutput {
 export class EmailTask {
   private langfuseService: LangfuseService;
   private openaiService: OpenAIService;
+  private emailService: EmailService;
 
-  constructor(langfuseService: LangfuseService, openaiService: OpenAIService) {
+  constructor(
+    langfuseService: LangfuseService,
+    openaiService: OpenAIService,
+    emailService: EmailService
+  ) {
     this.langfuseService = langfuseService;
     this.openaiService = openaiService;
+    this.emailService = emailService;
+  }
+
+  private parseEmailResponse(content: string): {
+    emailText: string;
+    duringEmailClarification: boolean;
+    shouldSendEmail: boolean;
+    clarificationText: string;
+  } {
+    try {
+      const parsedContent = JSON.parse(content);
+      return {
+        emailText: parsedContent.emailText || "",
+        duringEmailClarification:
+          parsedContent.duringEmailClarification || false,
+        shouldSendEmail: parsedContent.shouldSendEmail || false,
+        clarificationText: parsedContent.clarificationText || "",
+      };
+    } catch (error) {
+      console.error("Failed to parse email response:", error);
+      return {
+        emailText: "",
+        duringEmailClarification: false,
+        shouldSendEmail: false,
+        clarificationText: "",
+      };
+    }
   }
 
   async execute(input: EmailTaskInput): Promise<EmailTaskOutput> {
@@ -62,33 +102,11 @@ export class EmailTask {
 
     messages.push(
       {
-        role: "assistant",
-        content: `This is the last message from the user: ${input.userMessage}. Based on this message, please assume if user is still during email clarification.`,
-        timestamp: Date.now(),
-      },
-      {
-        role: "assistant",
-        content: `This is all the information from the user: \n Last message: ${input.userMessage.concat(
-          "\n"
-        )}${input.sessionHistory.messages
-          .map((msg: ChatMessage) => `\n${msg.role}: ${msg.content}`)
-          .join(
-            "\n"
-          )}. Based on this information, please assume if we should send email.`,
-        timestamp: Date.now(),
-      },
-      {
         role: "user",
         content: input.userMessage,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages
-        .map((msg: ChatMessage) => ({
-          role: msg.role,
-          content: msg.content,
-          timestamp: msg.timestamp,
-        }))
-        .reverse()
+      ...input.sessionHistory.messages.reverse()
     );
 
     // Create generation for this LLM call
@@ -109,13 +127,44 @@ export class EmailTask {
         messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
+          timestamp: msg.timestamp,
         })),
-        temperature: 0,
+        temperature: 0.3,
         max_tokens: 1000,
       });
 
+    const content = response.choices[0].message.content || "";
+
+    // Parse email response
+    const emailData = this.parseEmailResponse(content);
+
+    // Handle email sending if needed
+    let emailSent = false;
+    if (emailData.emailText && emailData.shouldSendEmail) {
+      try {
+        await this.emailService.sendEmail({
+          to: "ai.agent.logs@pragmaticcoders.com",
+          subject: `Hotel Guest Test Request - Language: ${input.detectedLanguage} - Tenant: ${input.tenantId}`,
+          text: emailData.emailText,
+        });
+        console.log(
+          "Email sent successfully to ai.agent.logs@pragmaticcoders.com"
+        );
+        emailSent = true;
+      } catch (error) {
+        console.error("Failed to send email:", error);
+        // Don't fail the request if email sending fails
+        emailSent = false;
+      }
+    }
+
     const result = {
-      content: response.choices[0].message.content || "",
+      content,
+      emailText: emailData.emailText,
+      duringEmailClarification: emailData.duringEmailClarification,
+      shouldSendEmail: emailData.shouldSendEmail,
+      clarificationText: emailData.clarificationText,
+      emailSent,
       usage: {
         promptTokens: response.usage?.prompt_tokens || 0,
         completionTokens: response.usage?.completion_tokens || 0,

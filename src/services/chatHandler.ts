@@ -56,7 +56,11 @@ export class ChatHandler {
       this.langfuseService,
       this.openaiService
     );
-    const emailTask = new EmailTask(this.langfuseService, this.openaiService);
+    const emailTask = new EmailTask(
+      this.langfuseService, 
+      this.openaiService,
+      this.emailService
+    );
 
     // 1st OpenAI call: user input + history + excel + guest-service prompt
     const firstResponse = await guestServiceTask.execute({
@@ -70,64 +74,40 @@ export class ChatHandler {
       trace,
     });
 
-    // 2nd & 3rd OpenAI calls: run in parallel using first call output
-    const [secondResponse, thirdResponse] = await Promise.all([
-      buttonsTask.execute({
-        userMessage: chatRequest.message,
-        firstCallOutput: firstResponse.content,
-        excelData: collectedData.excelData,
-        buttonsPrompt: collectedData.prompts.buttons,
-        knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
-        tenantConfig: collectedData.tenantConfig,
-        sessionId: chatRequest.sessionId,
-        trace,
-      }),
-      emailTask.execute({
-        userMessage: chatRequest.message,
-        firstCallOutput: firstResponse.content,
-        excelData: collectedData.excelData,
-        emailToolPrompt: collectedData.prompts.emailTool,
-        knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
-        tenantConfig: collectedData.tenantConfig,
-        sessionHistory: collectedData.sessionHistory,
-        sessionId: chatRequest.sessionId,
-        trace,
-      }),
-    ]);
+    // 2nd OpenAI call: buttons task
+    const secondResponse = await buttonsTask.execute({
+      userMessage: chatRequest.message,
+      firstCallOutput: firstResponse.content,
+      excelData: collectedData.excelData,
+      buttonsPrompt: collectedData.prompts.buttons,
+      knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
+      tenantConfig: collectedData.tenantConfig,
+      sessionId: chatRequest.sessionId,
+      trace,
+    });
 
-    // Parse buttons from secondResponse
-    const buttonsData = this.parseButtons(secondResponse.content);
-    const buttons = buttonsData.buttons;
-    const detectedLanguage = buttonsData.language;
+    // Use parsed buttons from secondResponse
+    const buttons = secondResponse.buttons;
+    const detectedLanguage = secondResponse.language;
 
-    let thirdResponseContent;
-    try {
-      thirdResponseContent = JSON.parse(thirdResponse.content);
-    } catch (error) {
-      console.error("Failed to parse third response:", error);
-      thirdResponseContent = {
-        emailText: "",
-        duringEmailClarification: false,
-        shouldSendEmail: false,
-        clarificationText: "",
-      };
-    }
+    // 3rd OpenAI call: email task with detected language
+    const thirdResponse = await emailTask.execute({
+      userMessage: chatRequest.message,
+      firstCallOutput: firstResponse.content,
+      excelData: collectedData.excelData,
+      emailToolPrompt: collectedData.prompts.emailTool,
+      knowledgeBasePrompt: collectedData.prompts.knowledgeBaseTool,
+      tenantConfig: collectedData.tenantConfig,
+      sessionHistory: collectedData.sessionHistory,
+      sessionId: chatRequest.sessionId,
+      tenantId: chatRequest.tenantId,
+      detectedLanguage: detectedLanguage,
+      trace,
+    });
 
-    if (thirdResponseContent.emailText && thirdResponseContent.shouldSendEmail) {
-      try {
-        await this.emailService.sendEmail({
-          to: "ai.agent.logs@pragmaticcoders.com",
-          subject: `Hotel Guest Test Request - Language: ${detectedLanguage} - Tenant: ${chatRequest.tenantId}`,
-          text: thirdResponseContent.emailText,
-        });
-        console.log(
-          "Email sent successfully to ai.agent.logs@pragmaticcoders.com"
-        );
-      } catch (error) {
-        console.error("Failed to send email:", error);
-        // Don't fail the request if email sending fails
-      }
-    }
+    const responseText = thirdResponse.duringEmailClarification
+      ? thirdResponse.clarificationText
+      : firstResponse.content;
 
     // Create the response structure
     const response: ChatResponse = {
@@ -141,9 +121,7 @@ export class ChatHandler {
           payload: {
             template_type: "button",
             language: detectedLanguage,
-            text: thirdResponseContent.duringEmailClarification
-              ? thirdResponseContent.clarificationText
-              : firstResponse.content,
+            text: responseText,
             buttons: buttons,
           },
         },
@@ -156,7 +134,7 @@ export class ChatHandler {
         chatRequest.sessionId,
         collectedData.sessionHistory,
         chatRequest.message,
-        thirdResponse.content
+        responseText
       );
     } catch (error) {
       console.error("Failed to save session memory:", error);
@@ -179,48 +157,5 @@ export class ChatHandler {
     await this.langfuseService.flush();
 
     return response;
-  }
-
-  private parseButtons(content: string): {
-    buttons: Array<{ type: "postback"; title: string; payload: string }>;
-    language: string;
-  } {
-    try {
-      // Clean the content by removing markdown code blocks and extra whitespace
-      let cleanContent = content.trim();
-
-      // Remove markdown code blocks if present
-      const jsonMatch = cleanContent.match(
-        /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
-      );
-      if (jsonMatch) {
-        cleanContent = jsonMatch[1];
-      }
-
-      // Extract JSON if it's wrapped in other text
-      const jsonObjectMatch = cleanContent.match(/\{[\s\S]*\}/);
-      if (jsonObjectMatch) {
-        cleanContent = jsonObjectMatch[0];
-      }
-
-      const buttonsData = JSON.parse(cleanContent);
-      if (buttonsData.result && Array.isArray(buttonsData.result)) {
-        return {
-          buttons: buttonsData.result.map((item: any) => ({
-            type: "postback" as const,
-            title: item.title,
-            payload: item.payload,
-          })),
-          language: buttonsData.language || "en",
-        };
-      }
-    } catch (error) {
-      console.warn("Failed to parse buttons from response:", error);
-      console.warn("Original content:", content);
-    }
-    return {
-      buttons: [],
-      language: "en",
-    };
   }
 }

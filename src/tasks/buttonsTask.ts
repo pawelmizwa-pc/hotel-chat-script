@@ -18,6 +18,8 @@ export interface ButtonsTaskInput {
 
 export interface ButtonsTaskOutput {
   content: string;
+  buttons: Array<{ type: "postback"; title: string; payload: string }>;
+  language: string;
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -33,6 +35,49 @@ export class ButtonsTask {
   constructor(langfuseService: LangfuseService, openaiService: OpenAIService) {
     this.langfuseService = langfuseService;
     this.openaiService = openaiService;
+  }
+
+  private parseButtons(content: string): {
+    buttons: Array<{ type: "postback"; title: string; payload: string }>;
+    language: string;
+  } {
+    try {
+      // Clean the content by removing markdown code blocks and extra whitespace
+      let cleanContent = content.trim();
+
+      // Remove markdown code blocks if present
+      const jsonMatch = cleanContent.match(
+        /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
+      );
+      if (jsonMatch) {
+        cleanContent = jsonMatch[1];
+      }
+
+      // Extract JSON if it's wrapped in other text
+      const jsonObjectMatch = cleanContent.match(/\{[\s\S]*\}/);
+      if (jsonObjectMatch) {
+        cleanContent = jsonObjectMatch[0];
+      }
+
+      const buttonsData = JSON.parse(cleanContent);
+      if (buttonsData.result && Array.isArray(buttonsData.result)) {
+        return {
+          buttons: buttonsData.result.map((item: any) => ({
+            type: "postback" as const,
+            title: item.title,
+            payload: item.payload,
+          })),
+          language: buttonsData.language || "en",
+        };
+      }
+    } catch (error) {
+      console.warn("Failed to parse buttons from response:", error);
+      console.warn("Original content:", content);
+    }
+    return {
+      buttons: [],
+      language: "en",
+    };
   }
 
   async execute(input: ButtonsTaskInput): Promise<ButtonsTaskOutput> {
@@ -98,8 +143,15 @@ export class ButtonsTask {
         max_tokens: 1000,
       });
 
+    const content = response.choices[0].message.content || "";
+
+    // Parse buttons from the response content
+    const buttonsData = this.parseButtons(content);
+
     const result = {
-      content: response.choices[0].message.content || "",
+      content,
+      buttons: buttonsData.buttons,
+      language: buttonsData.language,
       usage: {
         promptTokens: response.usage?.prompt_tokens || 0,
         completionTokens: response.usage?.completion_tokens || 0,
