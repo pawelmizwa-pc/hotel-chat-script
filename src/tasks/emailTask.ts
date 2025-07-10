@@ -105,7 +105,9 @@ export class EmailTask {
         content: input.userMessage,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages.reverse(),
+      ...input.sessionHistory.messages
+        .filter((msg) => msg.role === "user")
+        .reverse(),
       {
         role: "system",
         content:
