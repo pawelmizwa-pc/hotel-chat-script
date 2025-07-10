@@ -127,7 +127,7 @@ export class GuestServiceTask {
           {
             messages,
           },
-          "gpt-4o"
+          "gpt-4.1"
         )
       : null;
 
@@ -135,11 +135,13 @@ export class GuestServiceTask {
     const response = await this.openaiService
       .getClient()
       .chat.completions.create({
-        model: "gpt-4o",
+        model: "gpt-4.1",
         messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
         })),
+        temperature: 0,
+        max_tokens: 1000,
       });
 
     const content = response.choices[0].message.content || "";
