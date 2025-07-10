@@ -16,7 +16,6 @@ export interface EmailTaskInput {
   sessionHistory: SessionMemory;
   sessionId: string;
   tenantId?: string;
-  detectedLanguage: string;
   trace?: LangfuseTraceClient; // Langfuse trace object
 }
 
@@ -172,7 +171,7 @@ export class EmailTask {
       try {
         await this.emailService.sendEmail({
           to: "ai.agent.logs@pragmaticcoders.com",
-          subject: `Hotel Guest Test Request - Language: ${input.detectedLanguage} - Tenant: ${input.tenantId}`,
+          subject: `Hotel Guest Test Request - Tenant: ${input.tenantId}`,
           text: emailData.emailText,
         });
         console.log(

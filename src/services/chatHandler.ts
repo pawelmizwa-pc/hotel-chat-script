@@ -62,51 +62,58 @@ export class ChatHandler {
       this.emailService
     );
 
-    // Run guestServiceTask and buttonsTask in parallel (without firstCallOutput dependency)
-    const [firstResponse, secondResponse] = await Promise.all([
-      guestServiceTask.execute({
-        userMessage: chatRequest.message,
-        sessionHistory: collectedData.sessionHistory,
-        excelData: collectedData.excelData,
-        guestServicePrompt: collectedData.prompts.guestService,
-        excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
-        tenantConfig: collectedData.tenantConfig,
-        sessionId: chatRequest.sessionId,
-        trace,
-      }),
-      buttonsTask.execute({
-        userMessage: chatRequest.message,
-        // No firstCallOutput dependency
-        excelData: collectedData.excelData,
-        buttonsPrompt: collectedData.prompts.buttons,
-        excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
-        tenantConfig: collectedData.tenantConfig,
-        sessionId: chatRequest.sessionId,
-        trace,
-      }),
+    // Start guestServiceTask and buttonsTask in parallel
+    const guestServicePromise = guestServiceTask.execute({
+      userMessage: chatRequest.message,
+      sessionHistory: collectedData.sessionHistory,
+      excelData: collectedData.excelData,
+      guestServicePrompt: collectedData.prompts.guestService,
+      excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
+      tenantConfig: collectedData.tenantConfig,
+      sessionId: chatRequest.sessionId,
+      trace,
+    });
+
+    const buttonsPromise = buttonsTask.execute({
+      userMessage: chatRequest.message,
+      // No firstCallOutput dependency
+      excelData: collectedData.excelData,
+      buttonsPrompt: collectedData.prompts.buttons,
+      excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
+      tenantConfig: collectedData.tenantConfig,
+      sessionId: chatRequest.sessionId,
+      trace,
+    });
+
+    // Create a promise that waits for guestServiceTask and conditionally starts emailTask
+    const emailPromise = guestServicePromise.then(async (firstResponse) => {
+      if (firstResponse.isDuringServiceRequest) {
+        return emailTask.execute({
+          userMessage: chatRequest.message,
+          firstCallOutput: firstResponse.content,
+          excelData: collectedData.excelData,
+          emailToolPrompt: collectedData.prompts.emailTool,
+          excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
+          tenantConfig: collectedData.tenantConfig,
+          sessionHistory: collectedData.sessionHistory,
+          sessionId: chatRequest.sessionId,
+          tenantId: chatRequest.tenantId,
+          trace,
+        });
+      }
+      return Promise.resolve(null); // No email task needed
+    });
+
+    // Wait for all tasks to complete using Promise.all
+    const [firstResponse, secondResponse, thirdResponse] = await Promise.all([
+      guestServicePromise,
+      buttonsPromise,
+      emailPromise,
     ]);
 
     // Use parsed buttons from secondResponse
     const buttons = secondResponse.buttons;
     const detectedLanguage = secondResponse.language;
-
-    // Conditionally run email task only when isDuringServiceRequest is true
-    let thirdResponse = null;
-    if (firstResponse.isDuringServiceRequest) {
-      thirdResponse = await emailTask.execute({
-        userMessage: chatRequest.message,
-        firstCallOutput: firstResponse.content,
-        excelData: collectedData.excelData,
-        emailToolPrompt: collectedData.prompts.emailTool,
-        excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
-        tenantConfig: collectedData.tenantConfig,
-        sessionHistory: collectedData.sessionHistory,
-        sessionId: chatRequest.sessionId,
-        tenantId: chatRequest.tenantId,
-        detectedLanguage: detectedLanguage,
-        trace,
-      });
-    }
 
     // Use the parsed text from guest service response, or clarification text if email task was executed
     const responseText = thirdResponse?.duringEmailClarification
