@@ -114,10 +114,7 @@ export class EmailTask {
       },
       {
         role: "system",
-        content: createExcelMessage(
-          input.excelConfig || "",
-          input.excelData
-        ),
+        content: createExcelMessage(input.excelConfig || "", input.excelData),
         timestamp: Date.now(),
       },
     ];
@@ -151,8 +148,6 @@ export class EmailTask {
           content: msg.content,
           timestamp: msg.timestamp,
         })),
-        temperature: 0.5,
-        max_tokens: 1000,
       });
 
     const content = response.choices[0].message.content || "";

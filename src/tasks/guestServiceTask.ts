@@ -72,6 +72,10 @@ export class GuestServiceTask {
     } catch (error) {
       console.warn("Failed to parse guest service JSON response:", error);
       console.warn("Original content:", content);
+      return {
+        text: content,
+        isDuringServiceRequest: true,
+      };
     }
 
     // Fallback: if parsing fails, use the raw content as text and assume no service request
@@ -98,10 +102,7 @@ export class GuestServiceTask {
       },
       {
         role: "system",
-        content: createExcelMessage(
-          input.excelConfig || "",
-          input.excelData
-        ),
+        content: createExcelMessage(input.excelConfig || "", input.excelData),
         timestamp: Date.now(),
       },
       {
@@ -134,13 +135,11 @@ export class GuestServiceTask {
     const response = await this.openaiService
       .getClient()
       .chat.completions.create({
-        model: "gpt-4.1-mini",
+        model: "gpt-4o",
         messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,
         })),
-        temperature: 0,
-        max_tokens: 1000,
       });
 
     const content = response.choices[0].message.content || "";

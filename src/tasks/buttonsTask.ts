@@ -98,10 +98,7 @@ export class ButtonsTask {
       // Assistant messages (excel data)
       {
         role: "assistant",
-        content: createExcelMessage(
-          input.excelConfig || "",
-          input.excelData
-        ),
+        content: createExcelMessage(input.excelConfig || "", input.excelData),
         timestamp: Date.now(),
       },
     ];
@@ -143,8 +140,7 @@ export class ButtonsTask {
           role: msg.role,
           content: msg.content,
         })),
-        temperature: 0,
-        max_tokens: 1000,
+        temperature: 0.5,
       });
 
     const content = response.choices[0].message.content || "";
