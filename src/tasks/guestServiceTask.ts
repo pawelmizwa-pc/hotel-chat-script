@@ -89,10 +89,22 @@ export class GuestServiceTask {
     // Prepare messages for OpenAI call
     const messages: ChatMessage[] = [
       {
+        role: "user",
+        content: input.userMessage,
+        timestamp: Date.now(),
+      },
+      {
         role: "system",
         content:
           input.guestServicePrompt?.prompt ||
           "You are a helpful hotel assistant.",
+        timestamp: Date.now(),
+      },
+      {
+        role: "assistant",
+        content: `Session history, used as context for isDuringServiceRequest field: ${JSON.stringify(
+          input.sessionHistory.messages
+        )}`,
         timestamp: Date.now(),
       },
       {
@@ -105,18 +117,6 @@ export class GuestServiceTask {
         content: createExcelMessage(input.excelConfig || "", input.excelData),
         timestamp: Date.now(),
       },
-      {
-        role: "user",
-        content: input.userMessage,
-        timestamp: Date.now(),
-      },
-      {
-        role: "assistant",
-        content: `Session history, used as context for isDuringServiceRequest field: ${JSON.stringify(
-          input.sessionHistory.messages
-        )}`,
-        timestamp: Date.now(),
-      },
     ];
 
     // Create generation for this LLM call
@@ -127,7 +127,7 @@ export class GuestServiceTask {
           {
             messages,
           },
-          "gpt-4.1"
+          "gpt-4.1-mini"
         )
       : null;
 
@@ -135,7 +135,7 @@ export class GuestServiceTask {
     const response = await this.openaiService
       .getClient()
       .chat.completions.create({
-        model: "gpt-4.1",
+        model: "gpt-4.1-mini",
         messages: messages.map((msg) => ({
           role: msg.role,
           content: msg.content,

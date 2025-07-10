@@ -35,7 +35,7 @@ export class DataCollectionTask {
   private memoryService: MemoryService;
   private tenantConfigKV: KVNamespace;
   private tenantKnowledgeCache: KVNamespace;
-  private readonly CACHE_EXPIRY_MS = 60 * 60 * 1000; // 1 hour in milliseconds
+  private readonly CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
   constructor(
     langfuseService: LangfuseService,
