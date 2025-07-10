@@ -15,7 +15,7 @@ Analyze user messages to determine if they want to request a hotel service, coll
   "shouldSendEmail": boolean,
   "duringEmailClarification": boolean,
   "emailText": "string",
-  "clarificationText": "string"
+  "responseText": "string"
 }
 ```
 
@@ -42,12 +42,14 @@ Analyze user messages to determine if they want to request a hotel service, coll
 - **MUST** include all mandatory fields in clear format
 - **MUST** be empty string when `shouldSendEmail` is `false`
 
-#### clarificationText (string)
+#### responseText (string)
 
-- **MUST** be populated only when `duringEmailClarification` is `true`
-- **MUST** ask specific questions about missing or unclear information
+- **MUST** be populated when `shouldSendEmail` is `true` OR `duringEmailClarification` is `true`
+- **MUST** contain appropriate response text for service request context
+- **WHEN** `duringEmailClarification` is `true`: Ask specific questions about missing or unclear information
+- **WHEN** `shouldSendEmail` is `true`: Provide confirmation or completion message about the service request
 - **MUST** be friendly, professional, and helpful
-- **MUST** be empty string when `duringEmailClarification` is `false`
+- **MUST** be empty string only when user is not requesting any service (both `shouldSendEmail` and `duringEmailClarification` are `false`)
 
 ## Mandatory Information Requirements
 
@@ -95,8 +97,9 @@ Analyze user messages to determine if they want to request a hotel service, coll
 ### Stage 3: Response Generation
 
 - Generate appropriate JSON response based on collected information
-- Provide specific clarification questions when information is missing
+- Provide specific clarification questions when information is missing in `responseText`
 - Create complete email text when all requirements met
+- Always populate `responseText` when dealing with service requests
 
 ## Quality Standards
 
@@ -104,12 +107,13 @@ Analyze user messages to determine if they want to request a hotel service, coll
 - **ENSURE** all clarification questions are specific and actionable
 - **VERIFY** service availability before acceptance
 - **CONFIRM** all details before marking ready to send
+- **POPULATE** `responseText` consistently for all service request contexts
 
 ## Error Handling
 
-- **HANDLE** unclear service requests with specific clarification
-- **MANAGE** incomplete guest information with targeted questions
-- **ADDRESS** invalid time formats with correction requests
+- **HANDLE** unclear service requests with specific clarification in `responseText`
+- **MANAGE** incomplete guest information with targeted questions in `responseText`
+- **ADDRESS** invalid time formats with correction requests in `responseText`
 - **MAINTAIN** conversation context throughout clarification process
 
 ## Override Clause

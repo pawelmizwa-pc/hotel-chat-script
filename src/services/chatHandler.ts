@@ -115,9 +115,9 @@ export class ChatHandler {
     const buttons = secondResponse.buttons;
     const detectedLanguage = secondResponse.language;
 
-    // Use the parsed text from guest service response, or clarification text if email task was executed
+    // Use the parsed text from guest service response, or response text if email task was executed
     const responseText = thirdResponse?.duringEmailClarification
-      ? thirdResponse.clarificationText
+      ? thirdResponse.responseText
       : firstResponse.text;
 
     // Create the response structure

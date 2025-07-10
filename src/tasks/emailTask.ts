@@ -24,7 +24,7 @@ export interface EmailTaskOutput {
   emailText: string;
   duringEmailClarification: boolean;
   shouldSendEmail: boolean;
-  clarificationText: string;
+  responseText: string;
   emailSent: boolean;
   usage?: {
     promptTokens: number;
@@ -53,7 +53,7 @@ export class EmailTask {
     emailText: string;
     duringEmailClarification: boolean;
     shouldSendEmail: boolean;
-    clarificationText: string;
+    responseText: string;
   } {
     try {
       // Clean up markdown formatting from AI response
@@ -83,7 +83,7 @@ export class EmailTask {
         duringEmailClarification:
           parsedContent.duringEmailClarification || false,
         shouldSendEmail: parsedContent.shouldSendEmail || false,
-        clarificationText: parsedContent.clarificationText || "",
+        responseText: parsedContent.responseText || "",
       };
     } catch (error) {
       console.error("Failed to parse email response:", error);
@@ -92,7 +92,7 @@ export class EmailTask {
         emailText: "",
         duringEmailClarification: false,
         shouldSendEmail: false,
-        clarificationText: "",
+        responseText: "",
       };
     }
   }
@@ -190,7 +190,7 @@ export class EmailTask {
       emailText: emailData.emailText,
       duringEmailClarification: emailData.duringEmailClarification,
       shouldSendEmail: emailData.shouldSendEmail,
-      clarificationText: emailData.clarificationText,
+      responseText: emailData.responseText,
       emailSent,
       usage: {
         promptTokens: response.usage?.prompt_tokens || 0,
