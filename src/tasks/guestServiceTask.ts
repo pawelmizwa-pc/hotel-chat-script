@@ -127,7 +127,7 @@ export class GuestServiceTask {
           {
             messages,
           },
-          "gpt-4.1-mini"
+          "gpt-4o"
         )
       : null;
 
