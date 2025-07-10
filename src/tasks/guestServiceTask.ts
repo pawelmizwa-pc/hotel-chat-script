@@ -93,18 +93,12 @@ export class GuestServiceTask {
         content: input.userMessage,
         timestamp: Date.now(),
       },
+      ...input.sessionHistory.messages.reverse(),
       {
         role: "system",
         content:
           input.guestServicePrompt?.prompt ||
           "You are a helpful hotel assistant.",
-        timestamp: Date.now(),
-      },
-      {
-        role: "assistant",
-        content: `Session history, used as context for isDuringServiceRequest field: ${JSON.stringify(
-          input.sessionHistory.messages
-        )}`,
         timestamp: Date.now(),
       },
       {
@@ -115,6 +109,16 @@ export class GuestServiceTask {
       {
         role: "system",
         content: createExcelMessage(input.excelConfig || "", input.excelData),
+        timestamp: Date.now(),
+      },
+      {
+        role: "assistant",
+        content: `User provided the following information: ${
+          input.userMessage
+        }\n${input.sessionHistory.messages
+          .filter((msg) => msg.role === "user")
+          .map((msg) => msg.content)
+          .join("\n")}`,
         timestamp: Date.now(),
       },
     ];
