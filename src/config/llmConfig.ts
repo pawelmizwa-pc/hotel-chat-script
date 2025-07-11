@@ -16,7 +16,7 @@ export interface LLMTaskConfigs {
 
 export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
   buttonsTask: {
-    model: "gemini-2.0-flash",
+    model: "claude-3-5-haiku-latest",
     provider: "google",
     temperature: 0.5,
     maxTokens: 1000,
@@ -34,7 +34,7 @@ export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
     maxTokens: 1000,
   },
   excelSheetMatchingTask: {
-    model: "gemini-2.0-flash",
+    model: "claude-3-5-haiku-latest",
     provider: "google",
     temperature: 0.5,
     maxTokens: 1000,

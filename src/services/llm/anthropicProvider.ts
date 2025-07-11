@@ -10,9 +10,8 @@ import {
 export class AnthropicProvider extends BaseLLMProvider {
   readonly type = "anthropic" as const;
   readonly supportedModels = [
-    "claude-3-5-sonnet-20240620",
-    "claude-3-haiku-20240307",
     "claude-3-5-sonnet-latest",
+    "claude-3-5-haiku-latest",
   ];
 
   private anthropic: Anthropic | null = null;

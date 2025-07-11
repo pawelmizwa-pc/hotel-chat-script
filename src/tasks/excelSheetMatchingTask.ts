@@ -129,12 +129,31 @@ Please recommend the most relevant Excel sheets for this query.`,
       : null;
 
     // Call LLM service
-    const response = await this.llmService.createCompletion(messages, {
-      model: llmConfig.model,
-      provider: llmConfig.provider,
-      temperature: llmConfig.temperature,
-      maxTokens: llmConfig.maxTokens,
-    });
+    let response;
+    try {
+      response = await this.llmService.createCompletion(messages, {
+        model: llmConfig.model,
+        provider: llmConfig.provider,
+        temperature: llmConfig.temperature,
+        maxTokens: llmConfig.maxTokens,
+      });
+    } catch (error) {
+      // Log LLM failure to Langfuse generation
+      if (generation) {
+        generation.update({
+          metadata: {
+            llmError: {
+              message: error instanceof Error ? error.message : String(error),
+              task: "ExcelSheetMatchingTask",
+              model: llmConfig.model,
+              provider: llmConfig.provider,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        });
+      }
+      throw error;
+    }
 
     // Parse recommended sheets from the response
     const recommendedSheets = this.parseExcelSheets(

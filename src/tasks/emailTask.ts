@@ -159,12 +159,31 @@ export class EmailTask {
       : null;
 
     // Call LLM service with new architecture
-    const response = await this.llmService.createCompletion(messages, {
-      model: llmConfig.model,
-      provider: llmConfig.provider,
-      temperature: llmConfig.temperature,
-      maxTokens: llmConfig.maxTokens,
-    });
+    let response;
+    try {
+      response = await this.llmService.createCompletion(messages, {
+        model: llmConfig.model,
+        provider: llmConfig.provider,
+        temperature: llmConfig.temperature,
+        maxTokens: llmConfig.maxTokens,
+      });
+    } catch (error) {
+      // Log LLM failure to Langfuse generation
+      if (generation) {
+        generation.update({
+          metadata: {
+            llmError: {
+              message: error instanceof Error ? error.message : String(error),
+              task: "EmailTask",
+              model: llmConfig.model,
+              provider: llmConfig.provider,
+              timestamp: new Date().toISOString(),
+            },
+          },
+        });
+      }
+      throw error;
+    }
 
     const content = response.content;
 
