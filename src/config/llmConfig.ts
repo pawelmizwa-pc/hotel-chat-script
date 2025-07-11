@@ -16,7 +16,7 @@ export interface LLMTaskConfigs {
 
 export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
   buttonsTask: {
-    model: "deepseek/deepseek-r1-distill-llama-70b:free",
+    model: "tngtech/deepseek-r1t2-chimera:free",
     provider: "openrouter",
     temperature: 0,
     maxTokens: 1000,
@@ -34,7 +34,7 @@ export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
     maxTokens: 1000,
   },
   excelSheetMatchingTask: {
-    model: "deepseek/deepseek-r1-distill-llama-70b:free",
+    model: "tngtech/deepseek-r1t2-chimera:free",
     provider: "openrouter",
     temperature: 0,
     maxTokens: 1000,
