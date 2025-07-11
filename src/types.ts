@@ -49,6 +49,9 @@ export interface Env {
   // OpenAI
   OPENAI_API_KEY: string;
 
+  // OpenRouter
+  OPENROUTER_API_KEY?: string;
+
   // Google AI
   GOOGLE_AI_API_KEY?: string;
 
@@ -86,7 +89,7 @@ export interface Env {
 }
 
 // LLM Provider Types
-export type LLMProviderType = "openai" | "google" | "anthropic";
+export type LLMProviderType = "openai" | "google" | "anthropic" | "openrouter";
 
 export interface LLMCompletionOptions {
   model?: string;

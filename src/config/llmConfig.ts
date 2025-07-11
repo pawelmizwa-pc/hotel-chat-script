@@ -16,8 +16,8 @@ export interface LLMTaskConfigs {
 
 export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
   buttonsTask: {
-    model: "gpt-4.1-mini",
-    provider: "openai",
+    model: "deepseek/deepseek-r1-distill-llama-70b:free",
+    provider: "openrouter",
     temperature: 0,
     maxTokens: 1000,
   },
@@ -34,8 +34,8 @@ export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
     maxTokens: 1000,
   },
   excelSheetMatchingTask: {
-    model: "gpt-4.1-mini",
-    provider: "openai",
+    model: "deepseek/deepseek-r1-distill-llama-70b:free",
+    provider: "openrouter",
     temperature: 0,
     maxTokens: 1000,
   },

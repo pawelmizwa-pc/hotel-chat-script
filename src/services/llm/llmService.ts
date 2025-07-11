@@ -10,6 +10,7 @@ import {
 import { OpenAIProvider } from "./openaiProvider";
 import { GoogleProvider } from "./googleProvider";
 import { AnthropicProvider } from "./anthropicProvider";
+import { OpenRouterProvider } from "./openrouterProvider";
 
 export class LLMService {
   private providers: Map<LLMProviderType, LLMProvider> = new Map();
@@ -25,10 +26,12 @@ export class LLMService {
     const openai = new OpenAIProvider(this.env);
     const google = new GoogleProvider(this.env);
     const anthropic = new AnthropicProvider(this.env);
+    const openrouter = new OpenRouterProvider(this.env);
 
     this.providers.set("openai", openai);
     this.providers.set("google", google);
     this.providers.set("anthropic", anthropic);
+    this.providers.set("openrouter", openrouter);
   }
 
   /**
@@ -84,7 +87,7 @@ export class LLMService {
       model?: string;
       temperature?: number;
       maxTokens?: number;
-      provider?: "openai" | "google" | "anthropic";
+      provider?: LLMProviderType;
     } = {}
   ): Promise<{
     content: string;
