@@ -1,9 +1,10 @@
 import { LangfuseService } from "../services/langfuse";
-import { OpenAIService } from "../services/openaiService";
+import { LLMService } from "../services/llm";
 import { ChatMessage, SessionMemory, LangfusePrompt } from "../types";
 import { TenantConfig } from "./dataCollectionTask";
-import { createExcelMessage } from "../constants";
 import { LangfuseTraceClient } from "langfuse";
+import { parseLLMResult } from "../utils/llmResultParser";
+import { getLLMConfig } from "../config/llmConfig";
 
 export interface GuestServiceTaskInput {
   userMessage: string;
@@ -30,55 +31,66 @@ export interface GuestServiceTaskOutput {
 
 export class GuestServiceTask {
   private langfuseService: LangfuseService;
-  private openaiService: OpenAIService;
+  private llmService: LLMService;
 
-  constructor(langfuseService: LangfuseService, openaiService: OpenAIService) {
+  constructor(langfuseService: LangfuseService, llmService: LLMService) {
     this.langfuseService = langfuseService;
-    this.openaiService = openaiService;
+    this.llmService = llmService;
   }
 
-  private parseGuestServiceResponse(content: string): {
+  private parseGuestServiceResponse(
+    content: string,
+    generation?: any
+  ): {
     text: string;
     isDuringServiceRequest: boolean;
   } {
-    try {
-      // Clean the content by removing markdown code blocks and extra whitespace
-      let cleanContent = content.trim();
+    interface GuestServiceResponse {
+      text?: string;
+      isDuringServiceRequest?: boolean;
+    }
 
-      // Remove markdown code blocks if present
-      const jsonMatch = cleanContent.match(
-        /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
-      );
-      if (jsonMatch) {
-        cleanContent = jsonMatch[1];
-      }
+    const fallback: GuestServiceResponse = {
+      text: content, // Use raw content as fallback
+      isDuringServiceRequest: false,
+    };
 
-      // Extract JSON if it's wrapped in other text
-      const jsonObjectMatch = cleanContent.match(/\{[\s\S]*\}/);
-      if (jsonObjectMatch) {
-        cleanContent = jsonObjectMatch[0];
+    const responseData = parseLLMResult<GuestServiceResponse>(
+      content,
+      fallback,
+      (error, content) => {
+        // Log parsing error to Langfuse generation if available
+        if (generation) {
+          try {
+            generation.update({
+              metadata: {
+                parsingError: {
+                  message: error.message,
+                  task: "GuestServiceTask",
+                  originalContent: content.substring(0, 500), // Truncate for logging
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          } catch (logError) {
+            console.warn("Failed to log parsing error to Langfuse:", logError);
+          }
+        }
       }
+    );
 
-      const responseData = JSON.parse(cleanContent);
-      if (
-        responseData.text &&
-        typeof responseData.isDuringServiceRequest === "boolean"
-      ) {
-        return {
-          text: responseData.text,
-          isDuringServiceRequest: responseData.isDuringServiceRequest,
-        };
-      }
-    } catch (error) {
-      console.warn("Failed to parse guest service JSON response:", error);
-      console.warn("Original content:", content);
+    // Validate that we have proper values
+    if (
+      responseData.text &&
+      typeof responseData.isDuringServiceRequest === "boolean"
+    ) {
       return {
-        text: content,
-        isDuringServiceRequest: true,
+        text: responseData.text,
+        isDuringServiceRequest: responseData.isDuringServiceRequest,
       };
     }
 
-    // Fallback: if parsing fails, use the raw content as text and assume no service request
+    // Return fallback if validation fails
     return {
       text: content,
       isDuringServiceRequest: false,
@@ -108,7 +120,7 @@ export class GuestServiceTask {
       },
       {
         role: "system",
-        content: createExcelMessage(input.excelConfig || "", input.excelData),
+        content: input.excelData,
         timestamp: Date.now(),
       },
       {
@@ -123,6 +135,9 @@ export class GuestServiceTask {
       },
     ];
 
+    // Get LLM configuration for this task
+    const llmConfig = getLLMConfig("guestServiceTask");
+
     // Create generation for this LLM call
     const generation = input.trace
       ? this.langfuseService.createGeneration(
@@ -131,36 +146,31 @@ export class GuestServiceTask {
           {
             messages,
           },
-          "gpt-4.1-mini"
+          llmConfig.model
         )
       : null;
 
-    // Call OpenAI directly
-    const response = await this.openaiService
-      .getClient()
-      .chat.completions.create({
-        model: "gpt-4.1-mini",
-        messages: messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        temperature: 0,
-        max_tokens: 1000,
-      });
+    // Call LLM service with new architecture
+    const response = await this.llmService.createCompletion(messages, {
+      model: llmConfig.model,
+      provider: llmConfig.provider,
+      temperature: llmConfig.temperature,
+      maxTokens: llmConfig.maxTokens,
+    });
 
-    const content = response.choices[0].message.content || "";
+    const content = response.content;
 
     // Parse the JSON response to extract text and isDuringServiceRequest
-    const parsedResponse = this.parseGuestServiceResponse(content);
+    const parsedResponse = this.parseGuestServiceResponse(content, generation);
 
     const result = {
       content,
       text: parsedResponse.text,
       isDuringServiceRequest: parsedResponse.isDuringServiceRequest,
-      usage: {
-        promptTokens: response.usage?.prompt_tokens || 0,
-        completionTokens: response.usage?.completion_tokens || 0,
-        totalTokens: response.usage?.total_tokens || 0,
+      usage: response.usage || {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
       },
       traceId: input.sessionId,
     };

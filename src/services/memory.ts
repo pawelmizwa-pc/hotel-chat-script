@@ -3,6 +3,7 @@ import { Env, SessionMemory } from "../types";
 export class MemoryService {
   private kv: KVNamespace;
   private contextWindowLength: number;
+  private readonly MESSAGE_EXPIRY_MS = 4 * 60 * 60 * 1000; // 4 hours in milliseconds
 
   constructor(env: Env) {
     this.kv = env.CHAT_SESSIONS;
@@ -13,12 +14,37 @@ export class MemoryService {
     return `session:${sessionId}`;
   }
 
+  /**
+   * Filter messages to only include those newer than 4 hours
+   * @param memory - SessionMemory to filter
+   * @returns SessionMemory with filtered messages
+   */
+  private filterRecentMessages(memory: SessionMemory): SessionMemory {
+    const currentTime = Date.now();
+    const cutoffTime = currentTime - this.MESSAGE_EXPIRY_MS;
+
+    const filteredMessages = memory.messages.filter(
+      (message) => message.timestamp > cutoffTime
+    );
+
+    return {
+      ...memory,
+      messages: filteredMessages,
+    };
+  }
+
   async getSessionMemory(sessionId: string): Promise<SessionMemory | null> {
     try {
       const key = this.getSessionKey(sessionId);
       const data = await this.kv.get(key, "text");
       if (!data) return null;
-      return JSON.parse(data) as SessionMemory;
+
+      const sessionMemory = JSON.parse(data) as SessionMemory;
+
+      // Filter messages to only include those from the last 4 hours
+      const filteredMemory = this.filterRecentMessages(sessionMemory);
+
+      return filteredMemory;
     } catch (error) {
       console.error(`Error getting session memory for ${sessionId}:`, error);
       return null;

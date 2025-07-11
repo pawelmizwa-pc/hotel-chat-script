@@ -3,15 +3,17 @@ import { DataCollectionTask } from "../tasks/dataCollectionTask";
 import { GuestServiceTask } from "../tasks/guestServiceTask";
 import { ButtonsTask } from "../tasks/buttonsTask";
 import { EmailTask } from "../tasks/emailTask";
+import { ExcelSheetMatchingTask } from "../tasks/excelSheetMatchingTask";
+import { ExcelDataFetchingTask } from "../tasks/excelDataFetchingTask";
 import { MemoryService } from "./memory";
 import { LangfuseService } from "./langfuse";
-import { OpenAIService } from "./openaiService";
+import { LLMService } from "./llm";
 import { GoogleSheets } from "./googleSheets";
 import { EmailService } from "./emailService";
 
 export class ChatHandler {
   private langfuseService: LangfuseService;
-  private openaiService: OpenAIService;
+  private llmService: LLMService;
   private memoryService: MemoryService;
   private googleSheets: GoogleSheets;
   private emailService: EmailService;
@@ -20,7 +22,7 @@ export class ChatHandler {
   constructor(env: Env) {
     this.env = env;
     this.langfuseService = new LangfuseService(env);
-    this.openaiService = new OpenAIService(env);
+    this.llmService = new LLMService(env);
     this.memoryService = new MemoryService(env);
     this.googleSheets = new GoogleSheets(env);
     this.emailService = new EmailService(env);
@@ -36,10 +38,8 @@ export class ChatHandler {
     // Initialize by collecting data from all services
     const dataCollectionTask = new DataCollectionTask(
       this.langfuseService,
-      this.googleSheets,
       this.memoryService,
-      this.env.TENAT_CONFIG,
-      this.env.TENAT_KNOWLEDGE_CACHE
+      this.env.TENAT_CONFIG
     );
     const collectedData = await dataCollectionTask.collectData(
       chatRequest.sessionId,
@@ -47,18 +47,45 @@ export class ChatHandler {
       trace
     );
 
+    // Run Excel sheet matching task
+    const excelSheetMatchingTask = new ExcelSheetMatchingTask(
+      this.llmService,
+      this.langfuseService
+    );
+    const excelSheetMatchingResult = await excelSheetMatchingTask.execute({
+      userMessage: chatRequest.message,
+      excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
+      sessionId: chatRequest.sessionId,
+      excelPrompt: collectedData.prompts.excel || null,
+      trace,
+    });
+
+    // Get recommended sheets from Excel sheet matching result
+    const recommendedSheets = excelSheetMatchingResult.recommendedSheets;
+
+    // Run Excel data fetching task
+    const excelDataFetchingTask = new ExcelDataFetchingTask(
+      this.langfuseService,
+      this.googleSheets,
+      this.env.TENAT_KNOWLEDGE_CACHE
+    );
+    const excelDataResult = await excelDataFetchingTask.execute({
+      recommendedSheets,
+      tenantId: chatRequest.tenantId || "default",
+      sessionId: chatRequest.sessionId,
+      spreadsheetId: collectedData.tenantConfig?.spreadsheetId,
+      trace,
+    });
+
     // Initialize tasks with shared services
     const guestServiceTask = new GuestServiceTask(
       this.langfuseService,
-      this.openaiService
+      this.llmService
     );
-    const buttonsTask = new ButtonsTask(
-      this.langfuseService,
-      this.openaiService
-    );
+    const buttonsTask = new ButtonsTask(this.langfuseService, this.llmService);
     const emailTask = new EmailTask(
       this.langfuseService,
-      this.openaiService,
+      this.llmService,
       this.emailService
     );
 
@@ -66,7 +93,7 @@ export class ChatHandler {
     const guestServicePromise = guestServiceTask.execute({
       userMessage: chatRequest.message,
       sessionHistory: collectedData.sessionHistory,
-      excelData: collectedData.excelData,
+      excelData: excelDataResult.excelData,
       guestServicePrompt: collectedData.prompts.guestService,
       excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
       tenantConfig: collectedData.tenantConfig,
@@ -77,7 +104,7 @@ export class ChatHandler {
     const buttonsPromise = buttonsTask.execute({
       userMessage: chatRequest.message,
       // No firstCallOutput dependency
-      excelData: collectedData.excelData,
+      excelData: excelDataResult.excelData,
       buttonsPrompt: collectedData.prompts.buttons,
       excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
       tenantConfig: collectedData.tenantConfig,
@@ -91,7 +118,7 @@ export class ChatHandler {
         return emailTask.execute({
           userMessage: chatRequest.message,
           firstCallOutput: firstResponse.content,
-          excelData: collectedData.excelData,
+          excelData: excelDataResult.excelData,
           emailToolPrompt: collectedData.prompts.emailTool,
           excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
           tenantConfig: collectedData.tenantConfig,

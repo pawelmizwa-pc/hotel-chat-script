@@ -78,6 +78,54 @@ export class GoogleSheets {
   }
 
   /**
+   * Collect markdown from a specific sheet by name
+   * @param spreadSheetId - The ID of the Google Sheets document (optional, falls back to environment variable)
+   * @param sheetName - The name of the sheet to collect
+   * @returns Promise<string> - Sheet formatted as markdown
+   */
+  async collectSheetAsMarkdown(
+    spreadSheetId?: string,
+    sheetName?: string
+  ): Promise<string> {
+    try {
+      const documentId = spreadSheetId || this.env.GOOGLE_SHEETS_DOCUMENT_ID;
+      const doc = new GoogleSpreadsheet(documentId, {
+        apiKey: this.env.GOOGLE_SHEETS_API_KEY,
+      });
+
+      await doc.loadInfo();
+
+      // Find the sheet by name
+      const sheet = sheetName
+        ? doc.sheetsByTitle[sheetName]
+        : doc.sheetsByIndex[0]; // Default to first sheet if no name provided
+
+      if (!sheet) {
+        throw new Error(`Sheet "${sheetName}" not found in spreadsheet`);
+      }
+
+      // Process the specific sheet
+      const sheetMarkdownParts = await this.processSheet(sheet, 0);
+
+      return json2md(sheetMarkdownParts);
+    } catch (error) {
+      console.error(
+        `Error collecting sheet "${sheetName}" as markdown:`,
+        error
+      );
+      return json2md([
+        { h2: "Error" },
+        { p: `Sheet: ${sheetName}` },
+        {
+          blockquote: `Przepraszam, wystąpił błąd podczas odczytywania arkusza: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        },
+      ]);
+    }
+  }
+
+  /**
    * Process a single sheet in parallel
    * @param sheet The sheet to process
    * @param index Sheet index for error reporting

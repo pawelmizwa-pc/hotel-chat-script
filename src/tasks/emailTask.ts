@@ -1,10 +1,11 @@
 import { LangfuseService } from "../services/langfuse";
-import { OpenAIService } from "../services/openaiService";
+import { LLMService } from "../services/llm";
 import { EmailService } from "../services/emailService";
 import { ChatMessage, LangfusePrompt, SessionMemory } from "../types";
 import { TenantConfig } from "./dataCollectionTask";
-import { createExcelMessage } from "../constants";
 import { LangfuseTraceClient } from "langfuse";
+import { parseLLMResult } from "../utils/llmResultParser";
+import { getLLMConfig } from "../config/llmConfig";
 
 export interface EmailTaskInput {
   userMessage: string;
@@ -36,65 +37,72 @@ export interface EmailTaskOutput {
 
 export class EmailTask {
   private langfuseService: LangfuseService;
-  private openaiService: OpenAIService;
+  private llmService: LLMService;
   private emailService: EmailService;
 
   constructor(
     langfuseService: LangfuseService,
-    openaiService: OpenAIService,
+    llmService: LLMService,
     emailService: EmailService
   ) {
     this.langfuseService = langfuseService;
-    this.openaiService = openaiService;
+    this.llmService = llmService;
     this.emailService = emailService;
   }
 
-  private parseEmailResponse(content: string): {
+  private parseEmailResponse(
+    content: string,
+    generation?: any
+  ): {
     emailText: string;
     duringEmailClarification: boolean;
     shouldSendEmail: boolean;
     responseText: string;
   } {
-    try {
-      // Clean up markdown formatting from AI response
-      let cleanContent = content.trim();
-
-      // Remove markdown code block formatting
-      if (
-        cleanContent.startsWith("```json\n") ||
-        cleanContent.startsWith("```\n")
-      ) {
-        cleanContent = cleanContent
-          .replace(/^```(?:json)?\n/, "")
-          .replace(/\n```$/, "");
-      }
-
-      // Remove "json" prefix if present
-      if (cleanContent.startsWith("json\n")) {
-        cleanContent = cleanContent.replace(/^json\n/, "");
-      }
-
-      // Remove any remaining backticks
-      cleanContent = cleanContent.replace(/^`+|`+$/g, "");
-
-      const parsedContent = JSON.parse(cleanContent);
-      return {
-        emailText: parsedContent.emailText || "",
-        duringEmailClarification:
-          parsedContent.duringEmailClarification || false,
-        shouldSendEmail: parsedContent.shouldSendEmail || false,
-        responseText: parsedContent.responseText || "",
-      };
-    } catch (error) {
-      console.error("Failed to parse email response:", error);
-      console.error("Original content:", content);
-      return {
-        emailText: "",
-        duringEmailClarification: false,
-        shouldSendEmail: false,
-        responseText: "",
-      };
+    interface EmailResponse {
+      emailText?: string;
+      duringEmailClarification?: boolean;
+      shouldSendEmail?: boolean;
+      responseText?: string;
     }
+
+    const fallback: EmailResponse = {
+      emailText: "",
+      duringEmailClarification: false,
+      shouldSendEmail: false,
+      responseText: "",
+    };
+
+    const parsedContent = parseLLMResult<EmailResponse>(
+      content,
+      fallback,
+      (error, content) => {
+        // Log parsing error to Langfuse generation if available
+        if (generation) {
+          try {
+            generation.update({
+              metadata: {
+                parsingError: {
+                  message: error.message,
+                  task: "EmailTask",
+                  originalContent: content.substring(0, 500), // Truncate for logging
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          } catch (logError) {
+            console.warn("Failed to log parsing error to Langfuse:", logError);
+          }
+        }
+      }
+    );
+
+    return {
+      emailText: parsedContent.emailText || "",
+      duringEmailClarification: parsedContent.duringEmailClarification || false,
+      shouldSendEmail: parsedContent.shouldSendEmail || false,
+      responseText: parsedContent.responseText || "",
+    };
   }
 
   async execute(input: EmailTaskInput): Promise<EmailTaskOutput> {
@@ -121,7 +129,7 @@ export class EmailTask {
       },
       {
         role: "system",
-        content: createExcelMessage(input.excelConfig || "", input.excelData),
+        content: input.excelData,
         timestamp: Date.now(),
       },
       {
@@ -138,34 +146,31 @@ export class EmailTask {
 
     messages.push();
 
+    // Get LLM configuration for this task
+    const llmConfig = getLLMConfig("emailTask");
+
     // Create generation for this LLM call
     const generation = input.trace
       ? this.langfuseService.createGeneration(
           input.trace,
           "email-task",
           { messages },
-          "gpt-4.1"
+          llmConfig.model
         )
       : null;
 
-    // Call OpenAI directly
-    const response = await this.openaiService
-      .getClient()
-      .chat.completions.create({
-        model: "gpt-4.1",
-        messages: messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-          timestamp: msg.timestamp,
-        })),
-        temperature: 0,
-        max_tokens: 1000,
-      });
+    // Call LLM service with new architecture
+    const response = await this.llmService.createCompletion(messages, {
+      model: llmConfig.model,
+      provider: llmConfig.provider,
+      temperature: llmConfig.temperature,
+      maxTokens: llmConfig.maxTokens,
+    });
 
-    const content = response.choices[0].message.content || "";
+    const content = response.content;
 
     // Parse email response
-    const emailData = this.parseEmailResponse(content);
+    const emailData = this.parseEmailResponse(content, generation);
 
     // Handle email sending if needed
     let emailSent = false;
@@ -194,10 +199,10 @@ export class EmailTask {
       shouldSendEmail: emailData.shouldSendEmail,
       responseText: emailData.responseText,
       emailSent,
-      usage: {
-        promptTokens: response.usage?.prompt_tokens || 0,
-        completionTokens: response.usage?.completion_tokens || 0,
-        totalTokens: response.usage?.total_tokens || 0,
+      usage: response.usage || {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
       },
       traceId: input.sessionId,
     };

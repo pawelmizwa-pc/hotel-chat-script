@@ -24,11 +24,14 @@
     "wrangler": "^3.78.0"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.27.0",
+    "@google/generative-ai": "^0.21.0",
     "@langchain/core": "^0.2.31",
     "@langchain/openai": "^0.2.8",
     "google-spreadsheet": "^4.1.4",
     "googleapis": "^140.0.1",
     "json2md": "^2.0.3",
-    "langfuse": "^3.22.0"
+    "langfuse": "^3.22.0",
+    "openai": "^4.67.0"
   }
 }

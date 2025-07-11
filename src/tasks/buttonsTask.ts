@@ -1,9 +1,10 @@
 import { LangfuseService } from "../services/langfuse";
-import { OpenAIService } from "../services/openaiService";
+import { LLMService } from "../services/llm";
 import { ChatMessage, LangfusePrompt } from "../types";
 import { TenantConfig } from "./dataCollectionTask";
-import { createExcelMessage } from "../constants";
 import { LangfuseTraceClient } from "langfuse";
+import { parseLLMResult } from "../utils/llmResultParser";
+import { getLLMConfig } from "../config/llmConfig";
 
 export interface ButtonsTaskInput {
   userMessage: string;
@@ -30,50 +31,65 @@ export interface ButtonsTaskOutput {
 
 export class ButtonsTask {
   private langfuseService: LangfuseService;
-  private openaiService: OpenAIService;
+  private llmService: LLMService;
 
-  constructor(langfuseService: LangfuseService, openaiService: OpenAIService) {
+  constructor(langfuseService: LangfuseService, llmService: LLMService) {
     this.langfuseService = langfuseService;
-    this.openaiService = openaiService;
+    this.llmService = llmService;
   }
 
-  private parseButtons(content: string): {
+  private parseButtons(
+    content: string,
+    generation?: any
+  ): {
     buttons: Array<{ type: "postback"; title: string; payload: string }>;
     language: string;
   } {
-    try {
-      // Clean the content by removing markdown code blocks and extra whitespace
-      let cleanContent = content.trim();
-
-      // Remove markdown code blocks if present
-      const jsonMatch = cleanContent.match(
-        /```(?:json)?\s*(\{[\s\S]*?\})\s*```/
-      );
-      if (jsonMatch) {
-        cleanContent = jsonMatch[1];
-      }
-
-      // Extract JSON if it's wrapped in other text
-      const jsonObjectMatch = cleanContent.match(/\{[\s\S]*\}/);
-      if (jsonObjectMatch) {
-        cleanContent = jsonObjectMatch[0];
-      }
-
-      const buttonsData = JSON.parse(cleanContent);
-      if (buttonsData.result && Array.isArray(buttonsData.result)) {
-        return {
-          buttons: buttonsData.result.map((item: any) => ({
-            type: "postback" as const,
-            title: item.title,
-            payload: item.payload,
-          })),
-          language: buttonsData.language || "en",
-        };
-      }
-    } catch (error) {
-      console.warn("Failed to parse buttons from response:", error);
-      console.warn("Original content:", content);
+    interface ButtonsResponse {
+      result?: Array<{ title: string; payload: string }>;
+      language?: string;
     }
+
+    const fallback: ButtonsResponse = {
+      result: [],
+      language: "en",
+    };
+
+    const buttonsData = parseLLMResult<ButtonsResponse>(
+      content,
+      fallback,
+      (error, content) => {
+        // Log parsing error to Langfuse generation if available
+        if (generation) {
+          try {
+            generation.update({
+              metadata: {
+                parsingError: {
+                  message: error.message,
+                  task: "ButtonsTask",
+                  originalContent: content.substring(0, 500), // Truncate for logging
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          } catch (logError) {
+            console.warn("Failed to log parsing error to Langfuse:", logError);
+          }
+        }
+      }
+    );
+
+    if (buttonsData.result && Array.isArray(buttonsData.result)) {
+      return {
+        buttons: buttonsData.result.map((item: any) => ({
+          type: "postback" as const,
+          title: item.title,
+          payload: item.payload,
+        })),
+        language: buttonsData.language || "en",
+      };
+    }
+
     return {
       buttons: [],
       language: "en",
@@ -98,7 +114,7 @@ export class ButtonsTask {
       // Assistant messages (excel data)
       {
         role: "assistant",
-        content: createExcelMessage(input.excelConfig || "", input.excelData),
+        content: input.excelData,
         timestamp: Date.now(),
       },
     ];
@@ -119,6 +135,9 @@ export class ButtonsTask {
       timestamp: Date.now(),
     });
 
+    // Get LLM configuration for this task
+    const llmConfig = getLLMConfig("buttonsTask");
+
     // Create generation for this LLM call
     const generation = input.trace
       ? this.langfuseService.createGeneration(
@@ -127,35 +146,31 @@ export class ButtonsTask {
           {
             messages,
           },
-          "gpt-4.1-mini"
+          llmConfig.model
         )
       : null;
 
-    // Call OpenAI directly
-    const response = await this.openaiService
-      .getClient()
-      .chat.completions.create({
-        model: "gpt-4.1-mini",
-        messages: messages.map((msg) => ({
-          role: msg.role,
-          content: msg.content,
-        })),
-        temperature: 0.5,
-      });
+    // Call LLM service with new architecture
+    const response = await this.llmService.createCompletion(messages, {
+      model: llmConfig.model,
+      provider: llmConfig.provider,
+      temperature: llmConfig.temperature,
+      maxTokens: llmConfig.maxTokens,
+    });
 
-    const content = response.choices[0].message.content || "";
+    const content = response.content;
 
     // Parse buttons from the response content
-    const buttonsData = this.parseButtons(content);
+    const buttonsData = this.parseButtons(content, generation);
 
     const result = {
       content,
       buttons: buttonsData.buttons,
       language: buttonsData.language,
-      usage: {
-        promptTokens: response.usage?.prompt_tokens || 0,
-        completionTokens: response.usage?.completion_tokens || 0,
-        totalTokens: response.usage?.total_tokens || 0,
+      usage: response.usage || {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
       },
       traceId: input.sessionId,
     };

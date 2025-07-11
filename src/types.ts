@@ -49,6 +49,12 @@ export interface Env {
   // OpenAI
   OPENAI_API_KEY: string;
 
+  // Google AI
+  GOOGLE_AI_API_KEY?: string;
+
+  // Anthropic
+  ANTHROPIC_API_KEY?: string;
+
   // Langfuse
   LANGFUSE_HOST: string;
   LANGFUSE_SECRET_KEY: string;
@@ -77,6 +83,45 @@ export interface Env {
   CHAT_SESSIONS: KVNamespace;
   TENAT_CONFIG: KVNamespace;
   TENAT_KNOWLEDGE_CACHE: KVNamespace;
+}
+
+// LLM Provider Types
+export type LLMProviderType = "openai" | "google" | "anthropic";
+
+export interface LLMCompletionOptions {
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  stream?: boolean;
+}
+
+export interface LLMCompletionResponse {
+  content: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  model: string;
+  finishReason: string | null;
+  provider: LLMProviderType;
+}
+
+export interface LLMProvider {
+  readonly type: LLMProviderType;
+  readonly supportedModels: string[];
+  createCompletion(
+    messages: ChatMessage[],
+    options?: LLMCompletionOptions
+  ): Promise<LLMCompletionResponse>;
+  isAvailable(): boolean;
+}
+
+export interface LLMProviderConfig {
+  provider: LLMProviderType;
+  model: string;
+  temperature?: number;
+  maxTokens?: number;
 }
 
 export interface DynamicButton {

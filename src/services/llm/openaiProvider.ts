@@ -1,52 +1,49 @@
 import OpenAI from "openai";
-import { Env, ChatMessage } from "../types";
+import { BaseLLMProvider } from "./baseLLMProvider";
+import {
+  Env,
+  ChatMessage,
+  LLMCompletionOptions,
+  LLMCompletionResponse,
+} from "../../types";
 
-export class OpenAIService {
+export class OpenAIProvider extends BaseLLMProvider {
+  readonly type = "openai" as const;
+  readonly supportedModels = [
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4-turbo",
+    "gpt-4",
+    "gpt-3.5-turbo",
+  ];
+
   private openai: OpenAI;
-  private env: Env;
+  private apiKey: string;
 
   constructor(env: Env) {
-    this.env = env;
-
+    super();
+    this.apiKey = env.OPENAI_API_KEY;
     this.openai = new OpenAI({
-      apiKey: env.OPENAI_API_KEY,
+      apiKey: this.apiKey,
     });
   }
 
-  /**
-   * Create a chat completion
-   * @param messages Array of chat messages
-   * @param options Completion options
-   * @returns Promise with the completion response
-   */
+  isAvailable(): boolean {
+    return !!this.apiKey;
+  }
+
   async createCompletion(
     messages: ChatMessage[],
-    options: {
-      model?: string;
-      temperature?: number;
-      maxTokens?: number;
-    } = {}
-  ): Promise<{
-    content: string;
-    usage?: {
-      promptTokens: number;
-      completionTokens: number;
-      totalTokens: number;
-    };
-    model: string;
-    finishReason: string | null;
-  }> {
+    options: LLMCompletionOptions = {}
+  ): Promise<LLMCompletionResponse> {
+    const defaultOptions = this.getDefaultOptions();
     const {
-      model = "gpt-4.1-mini",
-      temperature = 0,
-      maxTokens = 1000,
+      model = defaultOptions.model,
+      temperature = defaultOptions.temperature,
+      maxTokens = defaultOptions.maxTokens,
     } = options;
 
-    // Convert ChatMessage[] to OpenAI format
-    const openaiMessages = messages.map((msg) => ({
-      role: msg.role,
-      content: msg.content,
-    }));
+    const openaiMessages = this.normalizeMessages(messages);
 
     try {
       const response = await this.openai.chat.completions.create({
@@ -72,6 +69,7 @@ export class OpenAIService {
           : undefined,
         model: response.model,
         finishReason: choice.finish_reason,
+        provider: this.type,
       };
     } catch (error) {
       console.error("OpenAI completion error:", error);
@@ -79,10 +77,6 @@ export class OpenAIService {
     }
   }
 
-  /**
-   * Get the underlying OpenAI client (for use with observeOpenAI)
-   * @returns OpenAI client instance
-   */
   getClient(): OpenAI {
     return this.openai;
   }
