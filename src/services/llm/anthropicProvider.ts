@@ -12,7 +12,7 @@ export class AnthropicProvider extends BaseLLMProvider {
   readonly supportedModels = [
     "claude-3-5-sonnet-20240620",
     "claude-3-haiku-20240307",
-    "laude-3-5-sonnet-latest",
+    "claude-3-5-sonnet-latest",
   ];
 
   private anthropic: Anthropic | null = null;

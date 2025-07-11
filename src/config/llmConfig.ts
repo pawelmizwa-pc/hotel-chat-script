@@ -22,13 +22,13 @@ export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
     maxTokens: 1000,
   },
   emailTask: {
-    model: "claude-3-5-sonnet-20241022",
+    model: "claude-3-5-sonnet-latest",
     provider: "anthropic",
     temperature: 0,
     maxTokens: 1000,
   },
   guestServiceTask: {
-    model: "claude-3-5-sonnet-20241022",
+    model: "claude-3-5-sonnet-latest",
     provider: "anthropic",
     temperature: 0.5,
     maxTokens: 1000,
