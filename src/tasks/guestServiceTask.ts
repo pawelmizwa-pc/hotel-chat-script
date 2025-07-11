@@ -11,7 +11,6 @@ export interface GuestServiceTaskInput {
   sessionHistory: SessionMemory;
   excelData: string;
   guestServicePrompt: LangfusePrompt | null;
-  excelConfig: string | null;
   tenantConfig: TenantConfig | null;
   sessionId: string;
   trace?: LangfuseTraceClient; // Langfuse trace object
@@ -105,7 +104,6 @@ export class GuestServiceTask {
         content: input.userMessage,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages.reverse(),
       {
         role: "system",
         content:

@@ -95,7 +95,6 @@ export class ChatHandler {
       sessionHistory: collectedData.sessionHistory,
       excelData: excelDataResult.excelData,
       guestServicePrompt: collectedData.prompts.guestService,
-      excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
       tenantConfig: collectedData.tenantConfig,
       sessionId: chatRequest.sessionId,
       trace,
@@ -106,7 +105,6 @@ export class ChatHandler {
       // No firstCallOutput dependency
       excelData: excelDataResult.excelData,
       buttonsPrompt: collectedData.prompts.buttons,
-      excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
       tenantConfig: collectedData.tenantConfig,
       sessionId: chatRequest.sessionId,
       trace,
@@ -120,7 +118,6 @@ export class ChatHandler {
           firstCallOutput: firstResponse.content,
           excelData: excelDataResult.excelData,
           emailToolPrompt: collectedData.prompts.emailTool,
-          excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
           tenantConfig: collectedData.tenantConfig,
           sessionHistory: collectedData.sessionHistory,
           sessionId: chatRequest.sessionId,

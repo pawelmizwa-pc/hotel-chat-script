@@ -1,5 +1,4 @@
 import { LangfuseService } from "../services/langfuse";
-import { GoogleSheets } from "../services/googleSheets";
 import { MemoryService } from "../services/memory";
 import { LangfusePrompt, SessionMemory } from "../types";
 import { LangfuseTraceClient } from "langfuse";

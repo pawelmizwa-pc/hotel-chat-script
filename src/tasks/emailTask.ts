@@ -12,7 +12,6 @@ export interface EmailTaskInput {
   firstCallOutput: string;
   excelData: string;
   emailToolPrompt: LangfusePrompt | null;
-  excelConfig: string | null;
   tenantConfig: TenantConfig | null;
   sessionHistory: SessionMemory;
   sessionId: string;

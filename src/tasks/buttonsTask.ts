@@ -11,7 +11,6 @@ export interface ButtonsTaskInput {
   firstCallOutput?: string; // Make this optional
   excelData: string;
   buttonsPrompt: LangfusePrompt | null;
-  excelConfig: string | null;
   tenantConfig: TenantConfig | null;
   sessionId: string;
   trace?: LangfuseTraceClient; // Langfuse trace object

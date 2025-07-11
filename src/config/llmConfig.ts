@@ -28,7 +28,7 @@ export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
     maxTokens: 1000,
   },
   guestServiceTask: {
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     provider: "google",
     temperature: 0.5,
     maxTokens: 1000,
