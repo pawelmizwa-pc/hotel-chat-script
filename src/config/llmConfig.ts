@@ -22,14 +22,14 @@ export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
     maxTokens: 1000,
   },
   emailTask: {
-    model: "gpt-4o",
-    provider: "openai",
+    model: "claude-3-5-sonnet-20241022",
+    provider: "anthropic",
     temperature: 0,
     maxTokens: 1000,
   },
   guestServiceTask: {
-    model: "gemini-2.5-flash",
-    provider: "google",
+    model: "claude-3-5-sonnet-20241022",
+    provider: "anthropic",
     temperature: 0.5,
     maxTokens: 1000,
   },
