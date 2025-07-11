@@ -163,99 +163,148 @@ export class ExcelDataFetchingTask {
         )
       : null;
 
-    const fetchedSheets: string[] = [];
-    const errors: string[] = [];
-    const excelDataParts: string[] = [];
+    try {
+      const fetchedSheets: string[] = [];
+      const errors: string[] = [];
+      const excelDataParts: string[] = [];
 
-    // Sort sheets by relevance score (highest first)
-    const sortedSheets = input.recommendedSheets.sort(
-      (a, b) => b.relevance_score - a.relevance_score
-    );
+      // Sort sheets by relevance score (highest first)
+      const sortedSheets = input.recommendedSheets.sort(
+        (a, b) => b.relevance_score - a.relevance_score
+      );
 
-    // Fetch each recommended sheet
-    for (const sheet of sortedSheets) {
-      try {
-        // Check cache first
-        const cachedData = await this.getCachedSheetData(
-          input.tenantId,
-          sheet.sheet_name
-        );
-
-        let sheetData: string;
-
-        if (cachedData && !cachedData.isExpired) {
-          // Use cached data if available and not expired
-          sheetData = cachedData.data;
-          console.log(
-            `Using cached data for ${input.tenantId}:${sheet.sheet_name}`
+      // Fetch each recommended sheet
+      for (const sheet of sortedSheets) {
+        try {
+          // Check cache first
+          const cachedData = await this.getCachedSheetData(
+            input.tenantId,
+            sheet.sheet_name
           );
-        } else {
-          // Data is missing or expired, fetch from Google Sheets
-          if (!input.spreadsheetId) {
-            errors.push(
-              `Sheet "${sheet.sheet_name}" not found in cache and no spreadsheet ID provided`
+
+          let sheetData: string;
+
+          if (cachedData && !cachedData.isExpired) {
+            // Use cached data if available and not expired
+            sheetData = cachedData.data;
+            console.log(
+              `Using cached data for ${input.tenantId}:${sheet.sheet_name}`
             );
-            continue;
+          } else {
+            // Data is missing or expired, fetch from Google Sheets
+            if (!input.spreadsheetId) {
+              errors.push(
+                `Sheet "${sheet.sheet_name}" not found in cache and no spreadsheet ID provided`
+              );
+              continue;
+            }
+
+            console.log(
+              `Fetching fresh data for ${input.tenantId}:${sheet.sheet_name} from Google Sheets`
+            );
+
+            try {
+              sheetData = await this.fetchSheetFromGoogleSheets(
+                input.spreadsheetId,
+                sheet.sheet_name
+              );
+
+              // Cache the fresh data
+              await this.cacheSheetData(
+                input.tenantId,
+                sheet.sheet_name,
+                sheetData
+              );
+            } catch (googleSheetsError) {
+              // If Google Sheets fails and we have expired cached data, use it as fallback
+              if (cachedData && cachedData.isExpired) {
+                sheetData = cachedData.data;
+                console.warn(
+                  `Using expired cached data for ${input.tenantId}:${sheet.sheet_name} due to Google Sheets error`
+                );
+              } else {
+                throw googleSheetsError;
+              }
+            }
           }
 
-          console.log(
-            `Fetching fresh data for ${input.tenantId}:${sheet.sheet_name} from Google Sheets`
-          );
+          excelDataParts.push(`## ${sheet.sheet_name}\n${sheetData}`);
+          fetchedSheets.push(sheet.sheet_name);
+        } catch (error) {
+          const errorMessage = `Error fetching sheet "${sheet.sheet_name}": ${error}`;
+          errors.push(errorMessage);
+          console.error(errorMessage);
 
-          try {
-            sheetData = await this.fetchSheetFromGoogleSheets(
-              input.spreadsheetId,
-              sheet.sheet_name
-            );
-
-            // Cache the fresh data
-            await this.cacheSheetData(
-              input.tenantId,
-              sheet.sheet_name,
-              sheetData
-            );
-          } catch (googleSheetsError) {
-            // If Google Sheets fails and we have expired cached data, use it as fallback
-            if (cachedData && cachedData.isExpired) {
-              sheetData = cachedData.data;
-              console.warn(
-                `Using expired cached data for ${input.tenantId}:${sheet.sheet_name} due to Google Sheets error`
-              );
-            } else {
-              throw googleSheetsError;
+          // Log individual sheet fetch error to span metadata
+          if (span) {
+            try {
+              span.update({
+                metadata: {
+                  sheetFetchError: {
+                    message: error instanceof Error ? error.message : String(error),
+                    task: "ExcelDataFetchingTask",
+                    sheetName: sheet.sheet_name,
+                    timestamp: new Date().toISOString(),
+                  },
+                },
+              });
+            } catch (logError) {
+              console.warn("Failed to log sheet fetch error to Langfuse:", logError);
             }
           }
         }
-
-        excelDataParts.push(`## ${sheet.sheet_name}\n${sheetData}`);
-        fetchedSheets.push(sheet.sheet_name);
-      } catch (error) {
-        const errorMessage = `Error fetching sheet "${sheet.sheet_name}": ${error}`;
-        errors.push(errorMessage);
-        console.error(errorMessage);
       }
+
+      // Combine all Excel data
+      const combinedExcelData = excelDataParts.join("\n\n");
+
+      const result: ExcelDataFetchingOutput = {
+        excelData: combinedExcelData || "No Excel data available",
+        fetchedSheets,
+        errors,
+      };
+
+      // End span with results
+      if (span) {
+        span.end({
+          output: result,
+          metadata: {
+            fetchedSheetsCount: fetchedSheets.length,
+            errorsCount: errors.length,
+          },
+        });
+      }
+
+      return result;
+    } catch (error) {
+      // Log overall task failure to span metadata
+      if (span) {
+        try {
+          span.update({
+            metadata: {
+              taskError: {
+                message: error instanceof Error ? error.message : String(error),
+                task: "ExcelDataFetchingTask",
+                timestamp: new Date().toISOString(),
+              },
+            },
+          });
+          
+          // End span with error
+          span.end({
+            output: null,
+            metadata: {
+              failed: true,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          });
+        } catch (logError) {
+          console.warn("Failed to log task error to Langfuse:", logError);
+        }
+      }
+      
+      // Re-throw the error to maintain the original behavior
+      throw error;
     }
-
-    // Combine all Excel data
-    const combinedExcelData = excelDataParts.join("\n\n");
-
-    const result: ExcelDataFetchingOutput = {
-      excelData: combinedExcelData || "No Excel data available",
-      fetchedSheets,
-      errors,
-    };
-
-    // End span with results
-    if (span) {
-      span.end({
-        output: result,
-        metadata: {
-          fetchedSheetsCount: fetchedSheets.length,
-          errorsCount: errors.length,
-        },
-      });
-    }
-
-    return result;
   }
 }
