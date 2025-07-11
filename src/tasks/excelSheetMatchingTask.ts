@@ -4,6 +4,7 @@ import { ChatMessage, LangfusePrompt } from "../types";
 import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
 import { getLLMConfig } from "../config/llmConfig";
+import { validateMessagesForAnthropic } from "../utils/messageValidator";
 
 export interface ExcelSheetMatchingInput {
   userMessage: string;
@@ -113,6 +114,9 @@ Please recommend the most relevant Excel sheets for this query.`,
       },
     ];
 
+    // Validate messages for Anthropic provider
+    const validatedMessages = validateMessagesForAnthropic(messages);
+
     // Get LLM configuration for this task
     const llmConfig = getLLMConfig("excelSheetMatchingTask");
 
@@ -122,7 +126,7 @@ Please recommend the most relevant Excel sheets for this query.`,
           input.trace,
           "excel-sheet-matching-task",
           {
-            messages,
+            messages: validatedMessages,
           },
           llmConfig.model
         )
@@ -131,7 +135,7 @@ Please recommend the most relevant Excel sheets for this query.`,
     // Call LLM service
     let response;
     try {
-      response = await this.llmService.createCompletion(messages, {
+      response = await this.llmService.createCompletion(validatedMessages, {
         model: llmConfig.model,
         provider: llmConfig.provider,
         temperature: llmConfig.temperature,

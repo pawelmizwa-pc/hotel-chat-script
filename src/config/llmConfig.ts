@@ -17,14 +17,14 @@ export interface LLMTaskConfigs {
 export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
   buttonsTask: {
     model: "claude-3-5-haiku-latest",
-    provider: "google",
+    provider: "anthropic",
     temperature: 0.5,
     maxTokens: 1000,
   },
   emailTask: {
     model: "claude-3-5-sonnet-latest",
     provider: "anthropic",
-    temperature: 0,
+    temperature: 0.5,
     maxTokens: 1000,
   },
   guestServiceTask: {
@@ -35,7 +35,7 @@ export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
   },
   excelSheetMatchingTask: {
     model: "claude-3-5-haiku-latest",
-    provider: "google",
+    provider: "anthropic",
     temperature: 0.5,
     maxTokens: 1000,
   },

@@ -5,6 +5,7 @@ import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
 import { getLLMConfig } from "../config/llmConfig";
+import { validateMessagesForAnthropic } from "../utils/messageValidator";
 
 export interface GuestServiceTaskInput {
   userMessage: string;
@@ -133,6 +134,9 @@ export class GuestServiceTask {
       },
     ];
 
+    // Validate messages for Anthropic provider
+    const validatedMessages = validateMessagesForAnthropic(messages);
+
     // Get LLM configuration for this task
     const llmConfig = getLLMConfig("guestServiceTask");
 
@@ -142,7 +146,7 @@ export class GuestServiceTask {
           input.trace,
           "guest-service-task",
           {
-            messages,
+            messages: validatedMessages,
           },
           llmConfig.model
         )
@@ -151,7 +155,7 @@ export class GuestServiceTask {
     // Call LLM service with new architecture
     let response;
     try {
-      response = await this.llmService.createCompletion(messages, {
+      response = await this.llmService.createCompletion(validatedMessages, {
         model: llmConfig.model,
         provider: llmConfig.provider,
         temperature: llmConfig.temperature,

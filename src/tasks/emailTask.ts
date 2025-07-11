@@ -6,6 +6,7 @@ import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
 import { getLLMConfig } from "../config/llmConfig";
+import { validateMessagesForAnthropic } from "../utils/messageValidator";
 
 export interface EmailTaskInput {
   userMessage: string;
@@ -143,7 +144,8 @@ export class EmailTask {
       },
     ];
 
-    messages.push();
+    // Validate messages for Anthropic provider
+    const validatedMessages = validateMessagesForAnthropic(messages);
 
     // Get LLM configuration for this task
     const llmConfig = getLLMConfig("emailTask");
@@ -153,7 +155,7 @@ export class EmailTask {
       ? this.langfuseService.createGeneration(
           input.trace,
           "email-task",
-          { messages },
+          { messages: validatedMessages },
           llmConfig.model
         )
       : null;
@@ -161,7 +163,7 @@ export class EmailTask {
     // Call LLM service with new architecture
     let response;
     try {
-      response = await this.llmService.createCompletion(messages, {
+      response = await this.llmService.createCompletion(validatedMessages, {
         model: llmConfig.model,
         provider: llmConfig.provider,
         temperature: llmConfig.temperature,
