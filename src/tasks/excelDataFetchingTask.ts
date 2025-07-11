@@ -56,11 +56,13 @@ export class ExcelDataFetchingTask {
    * Check if cached sheet data exists and is not expired
    * @param tenantId The tenant ID
    * @param sheetName The sheet name
+   * @param span Optional Langfuse span for error logging
    * @returns Promise<{ data: string; isExpired: boolean } | null>
    */
   private async getCachedSheetData(
     tenantId: string,
-    sheetName: string
+    sheetName: string,
+    span?: any
   ): Promise<{ data: string; isExpired: boolean } | null> {
     try {
       const cacheKey = this.getSheetCacheKey(tenantId, sheetName);
@@ -70,7 +72,125 @@ export class ExcelDataFetchingTask {
         return null;
       }
 
-      const cachedData: CachedSheetData = JSON.parse(cachedDataString);
+      // Enhanced JSON parsing with specific error handling
+      let cachedData: CachedSheetData;
+      try {
+        cachedData = JSON.parse(cachedDataString);
+      } catch (parseError) {
+        console.error(
+          `JSON parsing error for cached sheet data ${tenantId}:${sheetName}:`,
+          parseError
+        );
+
+        // Log JSON parsing error to Langfuse span with more details
+        if (span) {
+          try {
+            span.update({
+              metadata: {
+                jsonParseError: {
+                  message: parseError instanceof Error ? parseError.message : String(parseError),
+                  task: "ExcelDataFetchingTask",
+                  tenantId,
+                  sheetName,
+                  operation: "getCachedSheetData - JSON.parse",
+                  cachedDataLength: cachedDataString.length,
+                  cachedDataPreview: cachedDataString.substring(0, 200) + "...",
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          } catch (logError) {
+            console.warn("Failed to log JSON parse error to Langfuse:", logError);
+          }
+        }
+        return null;
+      }
+
+      // Validate the structure of parsed data
+      if (!cachedData || typeof cachedData !== 'object') {
+        console.error(
+          `Invalid cached data structure for ${tenantId}:${sheetName}: not an object`
+        );
+
+        if (span) {
+          try {
+            span.update({
+              metadata: {
+                dataValidationError: {
+                  message: "Cached data is not a valid object",
+                  task: "ExcelDataFetchingTask",
+                  tenantId,
+                  sheetName,
+                  operation: "getCachedSheetData - validation",
+                  cachedDataType: typeof cachedData,
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          } catch (logError) {
+            console.warn("Failed to log validation error to Langfuse:", logError);
+          }
+        }
+        return null;
+      }
+
+      // Validate required properties
+      if (!cachedData.data || typeof cachedData.data !== 'string') {
+        console.error(
+          `Invalid cached data for ${tenantId}:${sheetName}: missing or invalid 'data' property`
+        );
+
+        if (span) {
+          try {
+            span.update({
+              metadata: {
+                dataValidationError: {
+                  message: "Missing or invalid 'data' property",
+                  task: "ExcelDataFetchingTask",
+                  tenantId,
+                  sheetName,
+                  operation: "getCachedSheetData - validation",
+                  hasData: !!cachedData.data,
+                  dataType: typeof cachedData.data,
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          } catch (logError) {
+            console.warn("Failed to log validation error to Langfuse:", logError);
+          }
+        }
+        return null;
+      }
+
+      if (!cachedData.timestamp || typeof cachedData.timestamp !== 'number') {
+        console.error(
+          `Invalid cached data for ${tenantId}:${sheetName}: missing or invalid 'timestamp' property`
+        );
+
+        if (span) {
+          try {
+            span.update({
+              metadata: {
+                dataValidationError: {
+                  message: "Missing or invalid 'timestamp' property",
+                  task: "ExcelDataFetchingTask",
+                  tenantId,
+                  sheetName,
+                  operation: "getCachedSheetData - validation",
+                  hasTimestamp: !!cachedData.timestamp,
+                  timestampType: typeof cachedData.timestamp,
+                  timestamp: new Date().toISOString(),
+                },
+              },
+            });
+          } catch (logError) {
+            console.warn("Failed to log validation error to Langfuse:", logError);
+          }
+        }
+        return null;
+      }
+
       const now = Date.now();
       const isExpired = now - cachedData.timestamp > this.CACHE_EXPIRY_MS;
 
@@ -83,6 +203,27 @@ export class ExcelDataFetchingTask {
         `Error retrieving cached sheet data for ${tenantId}:${sheetName}:`,
         error
       );
+
+      // Log cache retrieval error to Langfuse span
+      if (span) {
+        try {
+          span.update({
+            metadata: {
+              cacheRetrievalError: {
+                message: error instanceof Error ? error.message : String(error),
+                task: "ExcelDataFetchingTask",
+                tenantId,
+                sheetName,
+                operation: "getCachedSheetData - general",
+                timestamp: new Date().toISOString(),
+              },
+            },
+          });
+        } catch (logError) {
+          console.warn("Failed to log cache retrieval error to Langfuse:", logError);
+        }
+      }
+
       return null;
     }
   }
@@ -179,7 +320,8 @@ export class ExcelDataFetchingTask {
           // Check cache first
           const cachedData = await this.getCachedSheetData(
             input.tenantId,
-            sheet.sheet_name
+            sheet.sheet_name,
+            span
           );
 
           let sheetData: string;
