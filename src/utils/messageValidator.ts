@@ -3,30 +3,35 @@ import { ChatMessage } from "../types";
 /**
  * Validates and filters out empty or invalid messages
  * @param messages - Array of ChatMessages to validate
- * @returns Filtered array with only valid, non-empty messages
+ * @returns Filtered array with only valid, non-empty messages with trimmed content
  */
 export function validateMessages(messages: ChatMessage[]): ChatMessage[] {
-  return messages.filter((message) => {
-    // Check if content exists and is not empty after trimming
-    const hasValidContent =
-      message.content && message.content.trim().length > 0;
+  return messages
+    .filter((message) => {
+      // Check if content exists and is not empty after trimming
+      const hasValidContent =
+        message.content && message.content.trim().length > 0;
 
-    // Check if role is valid
-    const hasValidRole =
-      message.role && ["user", "assistant", "system"].includes(message.role);
+      // Check if role is valid
+      const hasValidRole =
+        message.role && ["user", "assistant", "system"].includes(message.role);
 
-    // Log filtered messages for debugging
-    if (!hasValidContent || !hasValidRole) {
-      console.warn("Filtering out invalid message:", {
-        role: message.role,
-        contentLength: message.content?.length || 0,
-        isEmpty: !hasValidContent,
-        invalidRole: !hasValidRole,
-      });
-    }
+      // Log filtered messages for debugging
+      if (!hasValidContent || !hasValidRole) {
+        console.warn("Filtering out invalid message:", {
+          role: message.role,
+          contentLength: message.content?.length || 0,
+          isEmpty: !hasValidContent,
+          invalidRole: !hasValidRole,
+        });
+      }
 
-    return hasValidContent && hasValidRole;
-  });
+      return hasValidContent && hasValidRole;
+    })
+    .map((message) => ({
+      ...message,
+      content: message.content.trim(), // Trim content to remove leading/trailing whitespace
+    }));
 }
 
 /**

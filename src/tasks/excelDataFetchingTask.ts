@@ -88,7 +88,10 @@ export class ExcelDataFetchingTask {
             span.update({
               metadata: {
                 jsonParseError: {
-                  message: parseError instanceof Error ? parseError.message : String(parseError),
+                  message:
+                    parseError instanceof Error
+                      ? parseError.message
+                      : String(parseError),
                   task: "ExcelDataFetchingTask",
                   tenantId,
                   sheetName,
@@ -100,14 +103,17 @@ export class ExcelDataFetchingTask {
               },
             });
           } catch (logError) {
-            console.warn("Failed to log JSON parse error to Langfuse:", logError);
+            console.warn(
+              "Failed to log JSON parse error to Langfuse:",
+              logError
+            );
           }
         }
         return null;
       }
 
       // Validate the structure of parsed data
-      if (!cachedData || typeof cachedData !== 'object') {
+      if (!cachedData || typeof cachedData !== "object") {
         console.error(
           `Invalid cached data structure for ${tenantId}:${sheetName}: not an object`
         );
@@ -128,14 +134,17 @@ export class ExcelDataFetchingTask {
               },
             });
           } catch (logError) {
-            console.warn("Failed to log validation error to Langfuse:", logError);
+            console.warn(
+              "Failed to log validation error to Langfuse:",
+              logError
+            );
           }
         }
         return null;
       }
 
       // Validate required properties
-      if (!cachedData.data || typeof cachedData.data !== 'string') {
+      if (!cachedData.data || typeof cachedData.data !== "string") {
         console.error(
           `Invalid cached data for ${tenantId}:${sheetName}: missing or invalid 'data' property`
         );
@@ -157,13 +166,16 @@ export class ExcelDataFetchingTask {
               },
             });
           } catch (logError) {
-            console.warn("Failed to log validation error to Langfuse:", logError);
+            console.warn(
+              "Failed to log validation error to Langfuse:",
+              logError
+            );
           }
         }
         return null;
       }
 
-      if (!cachedData.timestamp || typeof cachedData.timestamp !== 'number') {
+      if (!cachedData.timestamp || typeof cachedData.timestamp !== "number") {
         console.error(
           `Invalid cached data for ${tenantId}:${sheetName}: missing or invalid 'timestamp' property`
         );
@@ -185,7 +197,10 @@ export class ExcelDataFetchingTask {
               },
             });
           } catch (logError) {
-            console.warn("Failed to log validation error to Langfuse:", logError);
+            console.warn(
+              "Failed to log validation error to Langfuse:",
+              logError
+            );
           }
         }
         return null;
@@ -220,7 +235,10 @@ export class ExcelDataFetchingTask {
             },
           });
         } catch (logError) {
-          console.warn("Failed to log cache retrieval error to Langfuse:", logError);
+          console.warn(
+            "Failed to log cache retrieval error to Langfuse:",
+            logError
+          );
         }
       }
 
@@ -370,7 +388,7 @@ export class ExcelDataFetchingTask {
             }
           }
 
-          excelDataParts.push(`## ${sheet.sheet_name}\n${sheetData}`);
+          excelDataParts.push(`## ${sheet.sheet_name}\n${sheetData.trim()}`);
           fetchedSheets.push(sheet.sheet_name);
         } catch (error) {
           const errorMessage = `Error fetching sheet "${sheet.sheet_name}": ${error}`;
@@ -383,7 +401,8 @@ export class ExcelDataFetchingTask {
               span.update({
                 metadata: {
                   sheetFetchError: {
-                    message: error instanceof Error ? error.message : String(error),
+                    message:
+                      error instanceof Error ? error.message : String(error),
                     task: "ExcelDataFetchingTask",
                     sheetName: sheet.sheet_name,
                     timestamp: new Date().toISOString(),
@@ -391,14 +410,17 @@ export class ExcelDataFetchingTask {
                 },
               });
             } catch (logError) {
-              console.warn("Failed to log sheet fetch error to Langfuse:", logError);
+              console.warn(
+                "Failed to log sheet fetch error to Langfuse:",
+                logError
+              );
             }
           }
         }
       }
 
       // Combine all Excel data
-      const combinedExcelData = excelDataParts.join("\n\n");
+      const combinedExcelData = excelDataParts.join("\n\n").trim();
 
       const result: ExcelDataFetchingOutput = {
         excelData: combinedExcelData || "No Excel data available",
@@ -431,7 +453,7 @@ export class ExcelDataFetchingTask {
               },
             },
           });
-          
+
           // End span with error
           span.end({
             output: null,
@@ -444,7 +466,7 @@ export class ExcelDataFetchingTask {
           console.warn("Failed to log task error to Langfuse:", logError);
         }
       }
-      
+
       // Re-throw the error to maintain the original behavior
       throw error;
     }
