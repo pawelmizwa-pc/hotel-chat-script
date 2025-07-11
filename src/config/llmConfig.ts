@@ -34,7 +34,7 @@ export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
     maxTokens: 1000,
   },
   excelSheetMatchingTask: {
-    model: "gpt-4.1-mini",
+    model: "gpt-4o",
     provider: "openai",
     temperature: 0,
     maxTokens: 1000,
