@@ -16,26 +16,26 @@ export interface LLMTaskConfigs {
 
 export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
   buttonsTask: {
-    model: "claude-3-5-haiku-latest",
-    provider: "anthropic",
+    model: "gpt-4.1-mini",
+    provider: "openai",
     temperature: 0,
     maxTokens: 1000,
   },
   emailTask: {
-    model: "gpt-4o-mini",
+    model: "gpt-4.1-mini",
     provider: "openai",
     temperature: 0.5,
     maxTokens: 1000,
   },
   guestServiceTask: {
-    model: "gpt-4o-mini",
+    model: "gpt-4.1-mini",
     provider: "openai",
     temperature: 0.5,
     maxTokens: 1000,
   },
   excelSheetMatchingTask: {
-    model: "claude-3-5-haiku-latest",
-    provider: "anthropic",
+    model: "gpt-4.1-mini",
+    provider: "openai",
     temperature: 0,
     maxTokens: 1000,
   },
