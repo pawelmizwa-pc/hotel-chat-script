@@ -37,22 +37,5 @@ export function formatConversationHistory(
     });
   }
 
-  // Add summary sections
-  if (userMessages.length > 0) {
-    formattedHistory += "### Guest Messages Summary\n\n";
-    userMessages.forEach((msg, index) => {
-      formattedHistory += `${index + 1}. ${msg.content}\n`;
-    });
-    formattedHistory += "\n";
-  }
-
-  if (assistantMessages.length > 0) {
-    formattedHistory += "### Previous Assistant Responses\n\n";
-    assistantMessages.forEach((msg, index) => {
-      formattedHistory += `${index + 1}. ${msg.content}\n`;
-    });
-    formattedHistory += "\n";
-  }
-
   return formattedHistory;
 }

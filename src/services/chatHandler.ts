@@ -58,6 +58,7 @@ export class ChatHandler {
       sessionId: chatRequest.sessionId,
       excelPrompt: collectedData.prompts.excel || null,
       llmConfig: collectedData.configs.excel,
+      sessionHistory: collectedData.sessionHistory,
       trace,
     });
 
@@ -110,6 +111,7 @@ export class ChatHandler {
       tenantConfig: collectedData.tenantConfig,
       sessionId: chatRequest.sessionId,
       llmConfig: collectedData.configs.buttons,
+      sessionHistory: collectedData.sessionHistory,
       trace,
     });
 
@@ -169,12 +171,16 @@ export class ChatHandler {
 
     // Save session memory before sending response
     try {
-      await this.memoryService.updateSessionWithConversation(
-        chatRequest.sessionId,
-        collectedData.sessionHistory,
-        chatRequest.message,
-        responseText
-      );
+      if (thirdResponse?.emailSent) {
+        await this.memoryService.clearSessionMemory(chatRequest.sessionId);
+      } else {
+        await this.memoryService.updateSessionWithConversation(
+          chatRequest.sessionId,
+          collectedData.sessionHistory,
+          chatRequest.message,
+          responseText
+        );
+      }
     } catch (error) {
       console.error("Failed to save session memory:", error);
       // Don't fail the request if memory saving fails

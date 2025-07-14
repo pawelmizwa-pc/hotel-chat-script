@@ -1,10 +1,11 @@
 import { LLMService } from "../services/llm/llmService";
 import { LangfuseService } from "../services/langfuse";
-import { ChatMessage, LangfusePrompt } from "../types";
+import { ChatMessage, LangfusePrompt, SessionMemory } from "../types";
 import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
 import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
+import { formatConversationHistory } from "../utils/format";
 
 export interface ExcelSheetMatchingInput {
   userMessage: string;
@@ -13,6 +14,7 @@ export interface ExcelSheetMatchingInput {
   excelPrompt: LangfusePrompt | null;
   llmConfig: TaskLLMConfig;
   trace?: LangfuseTraceClient;
+  sessionHistory: SessionMemory;
 }
 
 export interface ExcelSheetMatchingOutput {
@@ -95,22 +97,25 @@ export class ExcelSheetMatchingTask {
     // Prepare messages for LLM call
     const messages: ChatMessage[] = [
       {
+        role: "user",
+        content: input.userMessage,
+        timestamp: Date.now(),
+      },
+      {
+        role: "system",
+        content: formatConversationHistory(input.sessionHistory),
+        timestamp: Date.now(),
+      },
+      {
         role: "system",
         content:
           input.excelPrompt?.prompt ||
-          "You are an Excel sheet recommendation system.",
+          "Find most relevant sheets for the user message.",
         timestamp: Date.now(),
       },
       {
-        role: "assistant",
+        role: "system",
         content: input.excelConfig,
-        timestamp: Date.now(),
-      },
-      {
-        role: "user",
-        content: `User message: "${input.userMessage}"
-
-Please recommend the most relevant Excel sheets for this query.`,
         timestamp: Date.now(),
       },
     ];

@@ -102,4 +102,16 @@ export class MemoryService {
       throw error;
     }
   }
+
+  async clearSessionMemory(sessionId: string): Promise<void> {
+    try {
+      const key = this.getSessionKey(sessionId);
+      await this.kv.put(key, JSON.stringify({}), {
+        expirationTtl: 0,
+      });
+    } catch (error) {
+      console.error(`Error clearing session memory for ${sessionId}:`, error);
+      throw error;
+    }
+  }
 }

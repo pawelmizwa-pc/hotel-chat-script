@@ -1,11 +1,12 @@
 import { LangfuseService } from "../services/langfuse";
 import { LLMService } from "../services/llm";
-import { ChatMessage, LangfusePrompt } from "../types";
+import { ChatMessage, LangfusePrompt, SessionMemory } from "../types";
 import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
 import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
+import { formatConversationHistory } from "../utils/format";
 
 export interface ButtonsTaskInput {
   userMessage: string;
@@ -16,6 +17,7 @@ export interface ButtonsTaskInput {
   sessionId: string;
   llmConfig: TaskLLMConfig;
   trace?: LangfuseTraceClient; // Langfuse trace object
+  sessionHistory: SessionMemory;
 }
 
 export interface ButtonsTaskOutput {
@@ -100,7 +102,16 @@ export class ButtonsTask {
   async execute(input: ButtonsTaskInput): Promise<ButtonsTaskOutput> {
     // Prepare messages for OpenAI call
     const messages: ChatMessage[] = [
-      // System prompt from buttons
+      {
+        role: "user",
+        content: input.userMessage,
+        timestamp: Date.now(),
+      },
+      {
+        role: "system",
+        content: formatConversationHistory(input.sessionHistory),
+        timestamp: Date.now(),
+      },
       {
         role: "system",
         content:
@@ -108,33 +119,16 @@ export class ButtonsTask {
         timestamp: Date.now(),
       },
       {
-        role: "assistant",
+        role: "system",
         content: input.tenantConfig?.["buttons-prompt-config"] || "",
         timestamp: Date.now(),
       },
-      // Assistant messages (excel data)
       {
-        role: "assistant",
+        role: "system",
         content: input.excelData,
         timestamp: Date.now(),
       },
     ];
-
-    // Only include firstCallOutput if it's provided
-    if (input.firstCallOutput) {
-      messages.push({
-        role: "assistant",
-        content: input.firstCallOutput,
-        timestamp: Date.now(),
-      });
-    }
-
-    // User input
-    messages.push({
-      role: "user",
-      content: input.userMessage,
-      timestamp: Date.now(),
-    });
 
     // Validate messages for Anthropic provider
     const validatedMessages = validateMessagesForAnthropic(messages);
