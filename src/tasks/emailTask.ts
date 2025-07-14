@@ -114,9 +114,14 @@ export class EmailTask {
         content: input.userMessage,
         timestamp: Date.now(),
       },
-      ...input.sessionHistory.messages
-        .filter((msg) => msg.role === "user")
-        .reverse(),
+      {
+        role: "user",
+        content: `Previous messages: ${input.sessionHistory.messages
+          .filter((msg) => msg.role === "user")
+          .map((msg) => msg.content)
+          .join("\n")}`,
+        timestamp: Date.now(),
+      },
       {
         role: "system",
         content:
@@ -124,23 +129,13 @@ export class EmailTask {
         timestamp: Date.now(),
       },
       {
-        role: "assistant",
+        role: "system",
         content: input.tenantConfig?.["email-prompt-config"] || "",
         timestamp: Date.now(),
       },
       {
         role: "system",
         content: input.excelData,
-        timestamp: Date.now(),
-      },
-      {
-        role: "assistant",
-        content: `User provided the following information: \n${
-          input.userMessage
-        }\n${input.sessionHistory.messages
-          .filter((msg) => msg.role === "user")
-          .map((msg) => msg.content)
-          .join("\n")}`,
         timestamp: Date.now(),
       },
     ];
