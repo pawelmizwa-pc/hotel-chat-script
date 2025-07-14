@@ -115,6 +115,14 @@ export class GuestServiceTask {
         timestamp: Date.now(),
       },
       {
+        role: "assistant",
+        content: `Previous responses: ${input.sessionHistory.messages
+          .filter((msg) => msg.role === "assistant")
+          .map((msg) => msg.content)
+          .join("\n")}`,
+        timestamp: Date.now(),
+      },
+      {
         role: "system",
         content:
           input.guestServicePrompt?.prompt ||
