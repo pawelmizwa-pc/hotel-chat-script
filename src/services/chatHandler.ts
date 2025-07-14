@@ -91,54 +91,39 @@ export class ChatHandler {
       this.emailService
     );
 
-    // Start guestServiceTask and buttonsTask in parallel
-    const guestServicePromise = guestServiceTask.execute({
-      userMessage: chatRequest.message,
-      sessionHistory: collectedData.sessionHistory,
-      excelData: excelDataResult.excelData,
-      guestServicePrompt: collectedData.prompts.guestService,
-      tenantConfig: collectedData.tenantConfig,
-      sessionId: chatRequest.sessionId,
-      llmConfig: collectedData.configs.guestService,
-      trace,
-    });
-
-    const buttonsPromise = buttonsTask.execute({
-      userMessage: chatRequest.message,
-      // No firstCallOutput dependency
-      excelData: excelDataResult.excelData,
-      buttonsPrompt: collectedData.prompts.buttons,
-      tenantConfig: collectedData.tenantConfig,
-      sessionId: chatRequest.sessionId,
-      llmConfig: collectedData.configs.buttons,
-      sessionHistory: collectedData.sessionHistory,
-      trace,
-    });
-
-    // Create a promise that waits for guestServiceTask and conditionally starts emailTask
-    const emailPromise = guestServicePromise.then(async (firstResponse) => {
-      if (firstResponse.isDuringServiceRequest) {
-        return emailTask.execute({
-          userMessage: chatRequest.message,
-          firstCallOutput: firstResponse.content,
-          excelData: excelDataResult.excelData,
-          emailToolPrompt: collectedData.prompts.emailTool,
-          tenantConfig: collectedData.tenantConfig,
-          sessionHistory: collectedData.sessionHistory,
-          sessionId: chatRequest.sessionId,
-          tenantId: chatRequest.tenantId,
-          llmConfig: collectedData.configs.emailTool,
-          trace,
-        });
-      }
-      return Promise.resolve(null); // No email task needed
-    });
-
     // Wait for all tasks to complete using Promise.all
     const [firstResponse, secondResponse, thirdResponse] = await Promise.all([
-      guestServicePromise,
-      buttonsPromise,
-      emailPromise,
+      guestServiceTask.execute({
+        userMessage: chatRequest.message,
+        sessionHistory: collectedData.sessionHistory,
+        excelData: excelDataResult.excelData,
+        guestServicePrompt: collectedData.prompts.guestService,
+        tenantConfig: collectedData.tenantConfig,
+        sessionId: chatRequest.sessionId,
+        llmConfig: collectedData.configs.guestService,
+        trace,
+      }),
+      buttonsTask.execute({
+        userMessage: chatRequest.message,
+        excelData: excelDataResult.excelData,
+        buttonsPrompt: collectedData.prompts.buttons,
+        tenantConfig: collectedData.tenantConfig,
+        sessionId: chatRequest.sessionId,
+        llmConfig: collectedData.configs.buttons,
+        sessionHistory: collectedData.sessionHistory,
+        trace,
+      }),
+      emailTask.execute({
+        userMessage: chatRequest.message,
+        excelData: excelDataResult.excelData,
+        emailToolPrompt: collectedData.prompts.emailTool,
+        tenantConfig: collectedData.tenantConfig,
+        sessionHistory: collectedData.sessionHistory,
+        sessionId: chatRequest.sessionId,
+        tenantId: chatRequest.tenantId,
+        llmConfig: collectedData.configs.emailTool,
+        trace,
+      }),
     ]);
 
     // Use parsed buttons from secondResponse
@@ -148,7 +133,7 @@ export class ChatHandler {
     // Use the parsed text from guest service response, or response text if email task was executed
     const responseText = thirdResponse?.duringEmailClarification
       ? thirdResponse.responseText
-      : firstResponse.text;
+      : firstResponse.content;
 
     // Create the response structure
     const response: ChatResponse = {

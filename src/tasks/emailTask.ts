@@ -11,7 +11,6 @@ import { formatConversationHistory } from "../utils/format";
 
 export interface EmailTaskInput {
   userMessage: string;
-  firstCallOutput: string;
   excelData: string;
   emailToolPrompt: LangfusePrompt | null;
   tenantConfig: TenantConfig | null;

@@ -3,7 +3,6 @@ import { LLMService } from "../services/llm";
 import { ChatMessage, SessionMemory, LangfusePrompt } from "../types";
 import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
-import { parseLLMResult } from "../utils/llmResultParser";
 import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
 import { formatConversationHistory } from "../utils/format";
@@ -21,8 +20,6 @@ export interface GuestServiceTaskInput {
 
 export interface GuestServiceTaskOutput {
   content: string;
-  text: string; // Parsed text from JSON response
-  isDuringServiceRequest: boolean; // Parsed boolean from JSON response
   usage?: {
     promptTokens: number;
     completionTokens: number;
@@ -38,65 +35,6 @@ export class GuestServiceTask {
   constructor(langfuseService: LangfuseService, llmService: LLMService) {
     this.langfuseService = langfuseService;
     this.llmService = llmService;
-  }
-
-  private parseGuestServiceResponse(
-    content: string,
-    generation?: any
-  ): {
-    text: string;
-    isDuringServiceRequest: boolean;
-  } {
-    interface GuestServiceResponse {
-      text?: string;
-      isDuringServiceRequest?: boolean;
-    }
-
-    const fallback: GuestServiceResponse = {
-      text: content, // Use raw content as fallback
-      isDuringServiceRequest: false,
-    };
-
-    const responseData = parseLLMResult<GuestServiceResponse>(
-      content,
-      fallback,
-      (error, content) => {
-        // Log parsing error to Langfuse generation if available
-        if (generation) {
-          try {
-            generation.update({
-              metadata: {
-                parsingError: {
-                  message: error.message,
-                  task: "GuestServiceTask",
-                  originalContent: content.substring(0, 500), // Truncate for logging
-                  timestamp: new Date().toISOString(),
-                },
-              },
-            });
-          } catch (logError) {
-            console.warn("Failed to log parsing error to Langfuse:", logError);
-          }
-        }
-      }
-    );
-
-    // Validate that we have proper values
-    if (
-      responseData.text &&
-      typeof responseData.isDuringServiceRequest === "boolean"
-    ) {
-      return {
-        text: responseData.text,
-        isDuringServiceRequest: responseData.isDuringServiceRequest,
-      };
-    }
-
-    // Return fallback if validation fails
-    return {
-      text: content,
-      isDuringServiceRequest: false,
-    };
   }
 
   async execute(input: GuestServiceTaskInput): Promise<GuestServiceTaskOutput> {
@@ -178,13 +116,8 @@ export class GuestServiceTask {
 
     const content = response.content;
 
-    // Parse the JSON response to extract text and isDuringServiceRequest
-    const parsedResponse = this.parseGuestServiceResponse(content, generation);
-
     const result = {
       content,
-      text: parsedResponse.text,
-      isDuringServiceRequest: parsedResponse.isDuringServiceRequest,
       usage: response.usage || {
         promptTokens: 0,
         completionTokens: 0,
