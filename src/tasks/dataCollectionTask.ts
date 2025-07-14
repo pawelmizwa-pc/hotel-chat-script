@@ -2,6 +2,7 @@ import { LangfuseService } from "../services/langfuse";
 import { MemoryService } from "../services/memory";
 import { LangfusePrompt, SessionMemory } from "../types";
 import { LangfuseTraceClient } from "langfuse";
+import { TaskLLMConfig, LLM_TASK_CONFIGS } from "../config/llmConfig";
 
 export interface TenantConfig {
   spreadsheetId: string;
@@ -17,6 +18,12 @@ export interface DataCollectionResult {
     buttons: LangfusePrompt | null;
     emailTool: LangfusePrompt | null;
     excel: LangfusePrompt | null;
+  };
+  configs: {
+    guestService: TaskLLMConfig;
+    buttons: TaskLLMConfig;
+    emailTool: TaskLLMConfig;
+    excel: TaskLLMConfig;
   };
   sessionHistory: SessionMemory;
   tenantConfig: TenantConfig | null;
@@ -55,6 +62,48 @@ export class DataCollectionTask {
     } catch (error) {
       console.error(`Error fetching tenant config for ${tenantId}:`, error);
       return null;
+    }
+  }
+
+  /**
+   * Parse LLM configuration from Langfuse prompt config with fallback to defaults
+   * @param langfusePrompt The prompt from Langfuse
+   * @param taskName The task name to get default config for
+   * @returns TaskLLMConfig
+   */
+  private parseConfigWithFallback(
+    langfusePrompt: LangfusePrompt | null,
+    taskName: keyof typeof LLM_TASK_CONFIGS
+  ): TaskLLMConfig {
+    // Use default configuration as fallback
+    const defaultConfig = LLM_TASK_CONFIGS[taskName];
+
+    // If no prompt or no config, return default
+    if (!langfusePrompt || !langfusePrompt.config) {
+      return defaultConfig;
+    }
+
+    try {
+      // Config is already a parsed object, cast it to TaskLLMConfig
+      const parsedConfig = langfusePrompt.config as TaskLLMConfig;
+
+      // Validate required fields exist
+      if (!parsedConfig.model || !parsedConfig.provider) {
+        console.warn(
+          `Invalid config structure for ${taskName}, using defaults`
+        );
+        return defaultConfig;
+      }
+
+      return {
+        model: parsedConfig.model,
+        provider: parsedConfig.provider,
+        temperature: parsedConfig.temperature ?? defaultConfig.temperature,
+        maxTokens: parsedConfig.maxTokens ?? defaultConfig.maxTokens,
+      };
+    } catch (error) {
+      console.warn(`Error processing config for ${taskName}:`, error);
+      return defaultConfig;
     }
   }
 
@@ -133,19 +182,42 @@ export class DataCollectionTask {
         sessionHistoryTime: sessionHistoryResult.time,
       };
 
+      // Extract prompts with null fallback
+      const guestServicePromptValue =
+        guestServicePrompt.status === "fulfilled"
+          ? guestServicePrompt.value
+          : null;
+      const buttonsPromptValue =
+        buttonsPrompt.status === "fulfilled" ? buttonsPrompt.value : null;
+      const emailToolPromptValue =
+        emailToolPrompt.status === "fulfilled" ? emailToolPrompt.value : null;
+      const excelPromptValue =
+        excelPrompt.status === "fulfilled" ? excelPrompt.value : null;
+
       const result = {
         prompts: {
-          guestService:
-            guestServicePrompt.status === "fulfilled"
-              ? guestServicePrompt.value
-              : null,
-          buttons:
-            buttonsPrompt.status === "fulfilled" ? buttonsPrompt.value : null,
-          emailTool:
-            emailToolPrompt.status === "fulfilled"
-              ? emailToolPrompt.value
-              : null,
-          excel: excelPrompt.status === "fulfilled" ? excelPrompt.value : null,
+          guestService: guestServicePromptValue,
+          buttons: buttonsPromptValue,
+          emailTool: emailToolPromptValue,
+          excel: excelPromptValue,
+        },
+        configs: {
+          guestService: this.parseConfigWithFallback(
+            guestServicePromptValue,
+            "guestServiceTask"
+          ),
+          buttons: this.parseConfigWithFallback(
+            buttonsPromptValue,
+            "buttonsTask"
+          ),
+          emailTool: this.parseConfigWithFallback(
+            emailToolPromptValue,
+            "emailTask"
+          ),
+          excel: this.parseConfigWithFallback(
+            excelPromptValue,
+            "excelSheetMatchingTask"
+          ),
         },
         sessionHistory:
           sessionHistory.status === "fulfilled" && sessionHistory.value
