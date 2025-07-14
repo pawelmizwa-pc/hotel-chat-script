@@ -107,6 +107,14 @@ export class GuestServiceTask {
         timestamp: Date.now(),
       },
       {
+        role: "user",
+        content: `Previous messages: ${input.sessionHistory.messages
+          .filter((msg) => msg.role === "user")
+          .map((msg) => msg.content)
+          .join("\n")}`,
+        timestamp: Date.now(),
+      },
+      {
         role: "system",
         content:
           input.guestServicePrompt?.prompt ||
@@ -114,23 +122,13 @@ export class GuestServiceTask {
         timestamp: Date.now(),
       },
       {
-        role: "assistant",
+        role: "system",
         content: input.tenantConfig?.["general-prompt-config"] || "",
         timestamp: Date.now(),
       },
       {
         role: "system",
         content: input.excelData,
-        timestamp: Date.now(),
-      },
-      {
-        role: "assistant",
-        content: `User provided the following information: ${
-          input.userMessage
-        }\n${input.sessionHistory.messages
-          .filter((msg) => msg.role === "user")
-          .map((msg) => msg.content)
-          .join("\n")}`,
         timestamp: Date.now(),
       },
     ];
