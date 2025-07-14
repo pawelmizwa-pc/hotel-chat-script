@@ -9,12 +9,6 @@ import {
 
 export class OpenRouterProvider extends BaseLLMProvider {
   readonly type = "openrouter" as const;
-  readonly supportedModels = [
-    "deepseek/deepseek-r1-distill-llama-70b:free",
-    "deepseek/deepseek-v3-base:free",
-    "deepseek/deepseek-r1-0528-qwen3-8b:free",
-    "tngtech/deepseek-r1t2-chimera:free",
-  ];
 
   private openai: OpenAI;
   private apiKey: string;

@@ -112,7 +112,6 @@ export interface LLMCompletionResponse {
 
 export interface LLMProvider {
   readonly type: LLMProviderType;
-  readonly supportedModels: string[];
   createCompletion(
     messages: ChatMessage[],
     options?: LLMCompletionOptions

@@ -8,7 +8,6 @@ import {
 
 export abstract class BaseLLMProvider implements LLMProvider {
   abstract readonly type: LLMProviderType;
-  abstract readonly supportedModels: string[];
 
   abstract createCompletion(
     messages: ChatMessage[],
@@ -26,7 +25,7 @@ export abstract class BaseLLMProvider implements LLMProvider {
 
   protected getDefaultOptions(): Required<LLMCompletionOptions> {
     return {
-      model: this.supportedModels[0],
+      model: "gpt-4o-mini", // Default fallback model
       temperature: 0,
       maxTokens: 1000,
       stream: false,

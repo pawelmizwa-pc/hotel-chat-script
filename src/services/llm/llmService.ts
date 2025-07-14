@@ -51,32 +51,7 @@ export class LLMService {
     return provider && provider.isAvailable() ? provider : null;
   }
 
-  /**
-   * Get all supported models from all available providers
-   */
-  getSupportedModels(): Array<{
-    provider: LLMProviderType;
-    model: string;
-    displayName: string;
-  }> {
-    const models: Array<{
-      provider: LLMProviderType;
-      model: string;
-      displayName: string;
-    }> = [];
-
-    for (const provider of this.getAvailableProviders()) {
-      for (const model of provider.supportedModels) {
-        models.push({
-          provider: provider.type,
-          model,
-          displayName: `${provider.type.toUpperCase()} - ${model}`,
-        });
-      }
-    }
-
-    return models;
-  }
+  // getSupportedModels method removed - no longer restricting models
 
   /**
    * Create completion using specified provider and model
@@ -119,11 +94,7 @@ export class LLMService {
       throw new Error(`Provider ${config.provider} is not available`);
     }
 
-    if (!providerInstance.supportedModels.includes(config.model)) {
-      throw new Error(
-        `Model ${config.model} is not supported by ${config.provider}`
-      );
-    }
+    // Model validation removed - assuming user knows supported models
 
     const completionOptions: LLMCompletionOptions = {
       model: config.model,
@@ -157,11 +128,7 @@ export class LLMService {
       throw new Error(`Provider ${config.provider} is not available`);
     }
 
-    if (!provider.supportedModels.includes(config.model)) {
-      throw new Error(
-        `Model ${config.model} is not supported by ${config.provider}`
-      );
-    }
+    // Model validation removed - assuming user knows supported models
 
     const options: LLMCompletionOptions = {
       model: config.model,
@@ -183,10 +150,7 @@ export class LLMService {
   ): Promise<LLMCompletionResponse> {
     // Try preferred provider first
     const preferredProvider = this.getProvider(preferredConfig.provider);
-    if (
-      preferredProvider &&
-      preferredProvider.supportedModels.includes(preferredConfig.model)
-    ) {
+    if (preferredProvider) {
       try {
         return await this.createCompletion(messages, preferredConfig);
       } catch (error) {
@@ -200,10 +164,7 @@ export class LLMService {
     // Try fallback providers
     for (const fallbackConfig of fallbackConfigs) {
       const fallbackProvider = this.getProvider(fallbackConfig.provider);
-      if (
-        fallbackProvider &&
-        fallbackProvider.supportedModels.includes(fallbackConfig.model)
-      ) {
+      if (fallbackProvider) {
         try {
           return await this.createCompletion(messages, fallbackConfig);
         } catch (error) {
@@ -224,7 +185,7 @@ export class LLMService {
     const defaultProvider = availableProviders[0];
     const defaultConfig: LLMProviderConfig = {
       provider: defaultProvider.type,
-      model: defaultProvider.supportedModels[0],
+      model: "gpt-4o-mini", // Default fallback model
       temperature: preferredConfig.temperature,
       maxTokens: preferredConfig.maxTokens,
     };

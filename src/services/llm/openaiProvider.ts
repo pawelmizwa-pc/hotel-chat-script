@@ -9,12 +9,6 @@ import {
 
 export class OpenAIProvider extends BaseLLMProvider {
   readonly type = "openai" as const;
-  readonly supportedModels = [
-    "gpt-4o",
-    "gpt-4o-mini",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-  ];
 
   private openai: OpenAI;
   private apiKey: string;
