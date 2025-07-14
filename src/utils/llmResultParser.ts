@@ -1,4 +1,22 @@
 /**
+ * Extracts the model name from provider/model format for Langfuse compatibility
+ * OpenRouter models have format "provider/model-name" but Langfuse expects just "model-name"
+ * @param modelName - The full model name (e.g., "tngtech/deepseek-r1t2-chimera:free")
+ * @returns The model name without provider prefix (e.g., "deepseek-r1t2-chimera:free")
+ */
+export function extractModelNameForLangfuse(modelName: string): string {
+  // Check if the model name contains a provider prefix (format: provider/model-name)
+  if (modelName.includes("/")) {
+    // Split by '/' and return the part after the last '/'
+    const parts = modelName.split("/");
+    return parts[parts.length - 1];
+  }
+
+  // If no provider prefix, return as-is
+  return modelName;
+}
+
+/**
  * Generic utility function to parse LLM responses that contain JSON data
  * @param content - The raw content from LLM response
  * @param fallback - Default value to return if parsing fails

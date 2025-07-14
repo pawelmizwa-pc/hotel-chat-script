@@ -5,6 +5,7 @@ import {
   LangfuseGenerationClient,
 } from "langfuse";
 import { Env, LangfusePrompt, ChatMessage } from "../types";
+import { extractModelNameForLangfuse } from "../utils/llmResultParser";
 
 export class LangfuseService {
   private langfuse: Langfuse;
@@ -55,7 +56,7 @@ export class LangfuseService {
     return trace.generation({
       name,
       input,
-      model,
+      model: model ? extractModelNameForLangfuse(model) : undefined,
     });
   }
 
