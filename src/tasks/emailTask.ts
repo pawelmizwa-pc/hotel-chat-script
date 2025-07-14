@@ -7,6 +7,7 @@ import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
 import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
+import { formatConversationHistory } from "../utils/format";
 
 export interface EmailTaskInput {
   userMessage: string;
@@ -115,11 +116,8 @@ export class EmailTask {
         timestamp: Date.now(),
       },
       {
-        role: "user",
-        content: `Previous messages: ${input.sessionHistory.messages
-          .filter((msg) => msg.role === "user")
-          .map((msg) => msg.content)
-          .join("\n")}`,
+        role: "system",
+        content: formatConversationHistory(input.sessionHistory),
         timestamp: Date.now(),
       },
       {

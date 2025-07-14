@@ -6,6 +6,7 @@ import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
 import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
+import { formatConversationHistory } from "../utils/format";
 
 export interface GuestServiceTaskInput {
   userMessage: string;
@@ -107,19 +108,8 @@ export class GuestServiceTask {
         timestamp: Date.now(),
       },
       {
-        role: "user",
-        content: `Previous messages: ${input.sessionHistory.messages
-          .filter((msg) => msg.role === "user")
-          .map((msg) => msg.content)
-          .join("\n")}`,
-        timestamp: Date.now(),
-      },
-      {
-        role: "assistant",
-        content: `Previous responses: ${input.sessionHistory.messages
-          .filter((msg) => msg.role === "assistant")
-          .map((msg) => msg.content)
-          .join("\n")}`,
+        role: "system",
+        content: formatConversationHistory(input.sessionHistory),
         timestamp: Date.now(),
       },
       {
