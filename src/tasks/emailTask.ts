@@ -5,7 +5,7 @@ import { ChatMessage, LangfusePrompt, SessionMemory } from "../types";
 import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
-import { getLLMConfig } from "../config/llmConfig";
+import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
 
 export interface EmailTaskInput {
@@ -17,6 +17,7 @@ export interface EmailTaskInput {
   sessionHistory: SessionMemory;
   sessionId: string;
   tenantId?: string;
+  llmConfig: TaskLLMConfig;
   trace?: LangfuseTraceClient; // Langfuse trace object
 }
 
@@ -147,8 +148,8 @@ export class EmailTask {
     // Validate messages for Anthropic provider
     const validatedMessages = validateMessagesForAnthropic(messages);
 
-    // Get LLM configuration for this task
-    const llmConfig = getLLMConfig("emailTask");
+    // Use provided LLM configuration
+    const llmConfig = input.llmConfig;
 
     // Create generation for this LLM call
     const generation = input.trace

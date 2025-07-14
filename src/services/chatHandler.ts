@@ -57,6 +57,7 @@ export class ChatHandler {
       excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
       sessionId: chatRequest.sessionId,
       excelPrompt: collectedData.prompts.excel || null,
+      llmConfig: collectedData.configs.excel,
       trace,
     });
 
@@ -97,6 +98,7 @@ export class ChatHandler {
       guestServicePrompt: collectedData.prompts.guestService,
       tenantConfig: collectedData.tenantConfig,
       sessionId: chatRequest.sessionId,
+      llmConfig: collectedData.configs.guestService,
       trace,
     });
 
@@ -107,6 +109,7 @@ export class ChatHandler {
       buttonsPrompt: collectedData.prompts.buttons,
       tenantConfig: collectedData.tenantConfig,
       sessionId: chatRequest.sessionId,
+      llmConfig: collectedData.configs.buttons,
       trace,
     });
 
@@ -122,6 +125,7 @@ export class ChatHandler {
           sessionHistory: collectedData.sessionHistory,
           sessionId: chatRequest.sessionId,
           tenantId: chatRequest.tenantId,
+          llmConfig: collectedData.configs.emailTool,
           trace,
         });
       }

@@ -3,7 +3,7 @@ import { LangfuseService } from "../services/langfuse";
 import { ChatMessage, LangfusePrompt } from "../types";
 import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
-import { getLLMConfig } from "../config/llmConfig";
+import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
 
 export interface ExcelSheetMatchingInput {
@@ -11,6 +11,7 @@ export interface ExcelSheetMatchingInput {
   excelConfig: string;
   sessionId: string;
   excelPrompt: LangfusePrompt | null;
+  llmConfig: TaskLLMConfig;
   trace?: LangfuseTraceClient;
 }
 
@@ -117,8 +118,8 @@ Please recommend the most relevant Excel sheets for this query.`,
     // Validate messages for Anthropic provider
     const validatedMessages = validateMessagesForAnthropic(messages);
 
-    // Get LLM configuration for this task
-    const llmConfig = getLLMConfig("excelSheetMatchingTask");
+    // Use provided LLM configuration
+    const llmConfig = input.llmConfig;
 
     // Create generation for this LLM call
     const generation = input.trace
