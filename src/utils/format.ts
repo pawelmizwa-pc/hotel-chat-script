@@ -10,13 +10,6 @@ export function formatConversationHistory(
     return "## Conversation History\n\n*No previous messages*\n";
   }
 
-  const userMessages = sessionHistory.messages.filter(
-    (msg) => msg.role === "user"
-  );
-  const assistantMessages = sessionHistory.messages.filter(
-    (msg) => msg.role === "assistant"
-  );
-
   let formattedHistory = "## Conversation History\n\n";
 
   // Combine messages in chronological order
