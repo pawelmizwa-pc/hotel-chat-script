@@ -1,9 +1,24 @@
+export interface UTMTracking {
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  utm_term?: string;
+  utm_content?: string;
+  utm_id?: string;
+  gclid?: string; // Google Click ID
+  fbclid?: string; // Facebook Click ID
+  msclkid?: string; // Microsoft Click ID
+  [key: string]: string | undefined; // Allow additional UTM parameters
+}
+
 export interface ChatRequest {
   sessionId: string;
   message: string;
   language?: string;
   spreadSheetId?: string;
   tenantId?: string;
+  utmTracking?: UTMTracking;
+  hasUTMData?: boolean;
 }
 
 export interface ChatResponse {
@@ -118,6 +133,7 @@ export interface LLMProvider {
     options?: LLMCompletionOptions
   ): Promise<LLMCompletionResponse>;
   isAvailable(): boolean;
+  setTenantApiKey(apiKey: string | undefined): void;
 }
 
 export interface LLMProviderConfig {

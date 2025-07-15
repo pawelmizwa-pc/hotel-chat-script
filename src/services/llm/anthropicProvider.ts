@@ -11,20 +11,33 @@ export class AnthropicProvider extends BaseLLMProvider {
   readonly type = "anthropic" as const;
 
   private anthropic: Anthropic | null = null;
-  private apiKey: string | undefined;
+  private defaultApiKey: string | undefined;
 
   constructor(env: Env) {
     super();
-    this.apiKey = env.ANTHROPIC_API_KEY;
-    if (this.apiKey) {
+    this.defaultApiKey = env.ANTHROPIC_API_KEY;
+    this.initializeClient();
+  }
+
+  private initializeClient(): void {
+    const keyToUse = this.getApiKey(this.defaultApiKey || "");
+    if (keyToUse) {
       this.anthropic = new Anthropic({
-        apiKey: this.apiKey,
+        apiKey: keyToUse,
       });
+    } else {
+      this.anthropic = null;
     }
   }
 
+  setTenantApiKey(apiKey: string | undefined): void {
+    super.setTenantApiKey(apiKey);
+    this.initializeClient();
+  }
+
   isAvailable(): boolean {
-    return !!this.apiKey && !!this.anthropic;
+    const keyToUse = this.getApiKey(this.defaultApiKey || "");
+    return !!keyToUse && !!this.anthropic;
   }
 
   async createCompletion(

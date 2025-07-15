@@ -11,18 +11,28 @@ export class OpenAIProvider extends BaseLLMProvider {
   readonly type = "openai" as const;
 
   private openai: OpenAI;
-  private apiKey: string;
+  private defaultApiKey: string;
 
   constructor(env: Env) {
     super();
-    this.apiKey = env.OPENAI_API_KEY;
+    this.defaultApiKey = env.OPENAI_API_KEY;
     this.openai = new OpenAI({
-      apiKey: this.apiKey,
+      apiKey: this.defaultApiKey,
+    });
+  }
+
+  setTenantApiKey(apiKey: string | undefined): void {
+    super.setTenantApiKey(apiKey);
+    // Reinitialize client with the new API key
+    const keyToUse = this.getApiKey(this.defaultApiKey);
+    this.openai = new OpenAI({
+      apiKey: keyToUse,
     });
   }
 
   isAvailable(): boolean {
-    return !!this.apiKey;
+    const keyToUse = this.getApiKey(this.defaultApiKey);
+    return !!keyToUse;
   }
 
   async createCompletion(

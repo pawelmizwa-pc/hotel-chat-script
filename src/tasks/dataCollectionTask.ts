@@ -10,6 +10,11 @@ export interface TenantConfig {
   "buttons-prompt-config": string;
   "email-prompt-config": string;
   "excel-config": string;
+  // Optional API keys for LLM providers
+  "openai-api-key"?: string;
+  "openrouter-api-key"?: string;
+  "google-ai-api-key"?: string;
+  "anthropic-api-key"?: string;
 }
 
 export interface DataCollectionResult {

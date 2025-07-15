@@ -7,6 +7,7 @@ import {
   LLMCompletionOptions,
   LLMCompletionResponse,
 } from "../../types";
+import { TenantConfig } from "../../tasks/dataCollectionTask";
 import { OpenAIProvider } from "./openaiProvider";
 import { GoogleProvider } from "./googleProvider";
 import { AnthropicProvider } from "./anthropicProvider";
@@ -32,6 +33,44 @@ export class LLMService {
     this.providers.set("google", google);
     this.providers.set("anthropic", anthropic);
     this.providers.set("openrouter", openrouter);
+  }
+
+  /**
+   * Configure providers with tenant-specific API keys
+   * @param tenantConfig The tenant configuration containing optional API keys
+   */
+  configureTenantApiKeys(tenantConfig: TenantConfig | null): void {
+    if (!tenantConfig) return;
+
+    // Set tenant API keys for each provider if available
+    const openaiProvider = this.providers.get("openai");
+    if (openaiProvider && tenantConfig["openai-api-key"]) {
+      openaiProvider.setTenantApiKey(tenantConfig["openai-api-key"]);
+    }
+
+    const googleProvider = this.providers.get("google");
+    if (googleProvider && tenantConfig["google-ai-api-key"]) {
+      googleProvider.setTenantApiKey(tenantConfig["google-ai-api-key"]);
+    }
+
+    const anthropicProvider = this.providers.get("anthropic");
+    if (anthropicProvider && tenantConfig["anthropic-api-key"]) {
+      anthropicProvider.setTenantApiKey(tenantConfig["anthropic-api-key"]);
+    }
+
+    const openrouterProvider = this.providers.get("openrouter");
+    if (openrouterProvider && tenantConfig["openrouter-api-key"]) {
+      openrouterProvider.setTenantApiKey(tenantConfig["openrouter-api-key"]);
+    }
+  }
+
+  /**
+   * Reset all providers to use default API keys
+   */
+  resetToDefaultApiKeys(): void {
+    this.providers.forEach((provider) => {
+      provider.setTenantApiKey(undefined);
+    });
   }
 
   /**

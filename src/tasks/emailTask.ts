@@ -2,7 +2,12 @@ import { LangfuseService } from "../services/langfuse";
 import { LLMService } from "../services/llm";
 import { EmailService } from "../services/emailService";
 import { MemoryService } from "../services/memory";
-import { ChatMessage, LangfusePrompt, SessionMemory } from "../types";
+import {
+  ChatMessage,
+  SessionMemory,
+  LangfusePrompt,
+  UTMTracking,
+} from "../types";
 import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
@@ -20,6 +25,7 @@ export interface EmailTaskInput {
   tenantId?: string;
   llmConfig: TaskLLMConfig;
   trace?: LangfuseTraceClient; // Langfuse trace object
+  utmTracking?: UTMTracking; // UTM tracking data for conversion attribution
 }
 
 export interface EmailTaskOutput {
@@ -222,6 +228,16 @@ export class EmailTask {
           "Email sent successfully to ai.agent.logs@pragmaticcoders.com"
         );
         emailSent = true;
+
+        // Log conversion event with UTM attribution if available
+        if (input.trace) {
+          this.langfuseService.logConversion(
+            input.trace,
+            "email-request",
+            1, // Conversion value (can be customized)
+            input.utmTracking
+          );
+        }
       } catch (error) {
         console.error("Failed to send email:", error);
         // Don't fail the request if email sending fails

@@ -11,13 +11,18 @@ export class OpenRouterProvider extends BaseLLMProvider {
   readonly type = "openrouter" as const;
 
   private openai: OpenAI;
-  private apiKey: string;
+  private defaultApiKey: string;
 
   constructor(env: Env) {
     super();
-    this.apiKey = env.OPENROUTER_API_KEY || "";
+    this.defaultApiKey = env.OPENROUTER_API_KEY || "";
+    this.initializeClient();
+  }
+
+  private initializeClient(): void {
+    const keyToUse = this.getApiKey(this.defaultApiKey);
     this.openai = new OpenAI({
-      apiKey: this.apiKey,
+      apiKey: keyToUse,
       baseURL: "https://openrouter.ai/api/v1",
       defaultHeaders: {
         "HTTP-Referer": "https://hotel-chat-script.com",
@@ -26,8 +31,14 @@ export class OpenRouterProvider extends BaseLLMProvider {
     });
   }
 
+  setTenantApiKey(apiKey: string | undefined): void {
+    super.setTenantApiKey(apiKey);
+    this.initializeClient();
+  }
+
   isAvailable(): boolean {
-    return !!this.apiKey;
+    const keyToUse = this.getApiKey(this.defaultApiKey);
+    return !!keyToUse;
   }
 
   async createCompletion(

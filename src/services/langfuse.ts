@@ -4,7 +4,7 @@ import {
   LangfuseTraceClient,
   LangfuseGenerationClient,
 } from "langfuse";
-import { Env, LangfusePrompt } from "../types";
+import { Env, LangfusePrompt, UTMTracking } from "../types";
 import { extractModelNameForLangfuse } from "../utils/llmResultParser";
 import { LangfuseUsageDetails } from "../utils/usageTracker";
 
@@ -20,15 +20,38 @@ export class LangfuseService {
   }
 
   /**
-   * Create a trace for the entire request
+   * Create a trace for the entire request with optional UTM tracking
    */
-  createTrace(sessionId: string, input: any) {
-    return this.langfuse.trace({
+  createTrace(sessionId: string, input: any, utmTracking?: UTMTracking) {
+    const traceData: any = {
       sessionId,
       userId: sessionId,
       name: "hotel-chat-request",
       input,
-    });
+    };
+
+    // Add UTM tracking data to trace metadata if available
+    if (utmTracking) {
+      traceData.metadata = {
+        utmTracking,
+        hasMarketingData: true,
+        trackingTimestamp: new Date().toISOString(),
+      };
+
+      // Add UTM data as tags for easier filtering in Langfuse
+      traceData.tags = [
+        utmTracking.utm_source && `source:${utmTracking.utm_source}`,
+        utmTracking.utm_medium && `medium:${utmTracking.utm_medium}`,
+        utmTracking.utm_campaign && `campaign:${utmTracking.utm_campaign}`,
+        utmTracking.utm_term && `term:${utmTracking.utm_term}`,
+        utmTracking.utm_content && `content:${utmTracking.utm_content}`,
+        utmTracking.gclid && `gclid:present`,
+        utmTracking.fbclid && `fbclid:present`,
+        utmTracking.msclkid && `msclkid:present`,
+      ].filter(Boolean); // Remove falsy values
+    }
+
+    return this.langfuse.trace(traceData);
   }
 
   /**
@@ -81,6 +104,66 @@ export class LangfuseService {
     } else {
       generation.end({ output });
     }
+  }
+
+  /**
+   * Create a marketing/conversion event with UTM context
+   */
+  createMarketingEvent(
+    trace: LangfuseTraceClient,
+    eventName: string,
+    eventData: any,
+    utmContext?: UTMTracking
+  ): LangfuseSpanClient {
+    const eventMetadata: any = {
+      eventType: "marketing",
+      eventName,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (utmContext) {
+      eventMetadata.utmContext = utmContext;
+      eventMetadata.marketingAttribution = {
+        source: utmContext.utm_source,
+        medium: utmContext.utm_medium,
+        campaign: utmContext.utm_campaign,
+      };
+    }
+
+    return trace.span({
+      name: `marketing-event-${eventName}`,
+      input: eventData,
+      metadata: eventMetadata,
+    });
+  }
+
+  /**
+   * Log conversion events (email sends, bookings, etc.) with UTM attribution
+   */
+  logConversion(
+    trace: LangfuseTraceClient,
+    conversionType: string,
+    conversionValue?: number,
+    utmContext?: UTMTracking
+  ): void {
+    const conversionEvent = this.createMarketingEvent(
+      trace,
+      `conversion-${conversionType}`,
+      {
+        conversionType,
+        conversionValue,
+        conversionTimestamp: new Date().toISOString(),
+      },
+      utmContext
+    );
+
+    conversionEvent.end({
+      output: {
+        success: true,
+        conversionType,
+        value: conversionValue,
+      },
+    });
   }
 
   /**

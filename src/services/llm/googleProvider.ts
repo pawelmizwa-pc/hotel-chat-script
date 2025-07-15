@@ -11,18 +11,31 @@ export class GoogleProvider extends BaseLLMProvider {
   readonly type = "google" as const;
 
   private genAI: GoogleGenerativeAI | null = null;
-  private apiKey: string | undefined;
+  private defaultApiKey: string | undefined;
 
   constructor(env: Env) {
     super();
-    this.apiKey = env.GOOGLE_AI_API_KEY;
-    if (this.apiKey) {
-      this.genAI = new GoogleGenerativeAI(this.apiKey);
+    this.defaultApiKey = env.GOOGLE_AI_API_KEY;
+    this.initializeClient();
+  }
+
+  private initializeClient(): void {
+    const keyToUse = this.getApiKey(this.defaultApiKey || "");
+    if (keyToUse) {
+      this.genAI = new GoogleGenerativeAI(keyToUse);
+    } else {
+      this.genAI = null;
     }
   }
 
+  setTenantApiKey(apiKey: string | undefined): void {
+    super.setTenantApiKey(apiKey);
+    this.initializeClient();
+  }
+
   isAvailable(): boolean {
-    return !!this.apiKey && !!this.genAI;
+    const keyToUse = this.getApiKey(this.defaultApiKey || "");
+    return !!keyToUse && !!this.genAI;
   }
 
   async createCompletion(

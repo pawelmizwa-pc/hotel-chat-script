@@ -34,12 +34,21 @@ export class ChatHandler {
     const sessionId = chatRequest.sessionId;
     const language = chatRequest.language;
     const userMessage = chatRequest.message;
+    const utmTracking = chatRequest.utmTracking;
+    const hasUTMData = chatRequest.hasUTMData || false;
 
-    // Create Langfuse trace for the entire request
-    const trace = this.langfuseService.createTrace(sessionId, {
-      userMessage,
-      language,
-    });
+    // Create Langfuse trace for the entire request with UTM tracking
+    const trace = this.langfuseService.createTrace(
+      sessionId,
+      {
+        userMessage,
+        language,
+        tenantId,
+        hasUTMData,
+        requestTimestamp: new Date().toISOString(),
+      },
+      utmTracking
+    );
 
     // Initialize by collecting data from all services
     const dataCollectionTask = new DataCollectionTask(
@@ -52,6 +61,9 @@ export class ChatHandler {
       tenantId,
       trace,
     });
+
+    // Configure LLM service with tenant-specific API keys if available
+    this.llmService.configureTenantApiKeys(collectedData.tenantConfig);
 
     // Run Excel sheet matching task
     const excelSheetMatchingTask = new ExcelSheetMatchingTask(
@@ -130,8 +142,12 @@ export class ChatHandler {
         tenantId,
         llmConfig: collectedData.configs.emailTool,
         trace,
+        utmTracking,
       }),
     ]);
+
+    // Reset to default API keys after processing (optional, for cleanup)
+    this.llmService.resetToDefaultApiKeys();
 
     // Use parsed buttons from secondResponse
     const buttons = secondResponse.buttons;

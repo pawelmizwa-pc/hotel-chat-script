@@ -1,0 +1,52 @@
+{
+  "example_request_with_utm": {
+    "message": "Hello, I'd like to book a spa treatment",
+    "sessionId": "session_123",
+    "language": "en", 
+    "tenantId": "hotel-smile",
+    "hasUTMData": true,
+    "utmTracking": {
+      "utm_source": "google",
+      "utm_medium": "cpc",
+      "utm_campaign": "summer_spa_promotion",
+      "utm_term": "hotel spa treatment",
+      "utm_content": "spa_banner_ad",
+      "utm_id": "campaign_12345",
+      "gclid": "TeSter-123_example_gclid"
+    }
+  },
+  "example_request_facebook": {
+    "message": "What dining options do you have?",
+    "sessionId": "session_456",
+    "language": "en",
+    "tenantId": "hotel-smile", 
+    "hasUTMData": true,
+    "utmTracking": {
+      "utm_source": "facebook",
+      "utm_medium": "social",
+      "utm_campaign": "dining_promotion",
+      "utm_content": "restaurant_post",
+      "fbclid": "IwAR0example_facebook_click_id"
+    }
+  },
+  "example_request_email": {
+    "message": "I received your newsletter and want to book a room",
+    "sessionId": "session_789", 
+    "language": "en",
+    "tenantId": "hotel-smile",
+    "hasUTMData": true,
+    "utmTracking": {
+      "utm_source": "newsletter",
+      "utm_medium": "email",
+      "utm_campaign": "monthly_newsletter_june",
+      "utm_content": "room_booking_cta"
+    }
+  },
+  "example_request_no_utm": {
+    "message": "Hello, what are your rates?",
+    "sessionId": "session_000",
+    "language": "en",
+    "tenantId": "hotel-smile",
+    "hasUTMData": false
+  }
+} 
