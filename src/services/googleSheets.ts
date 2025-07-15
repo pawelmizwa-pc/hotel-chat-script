@@ -1,4 +1,5 @@
 import { GoogleSpreadsheet } from "google-spreadsheet";
+import { JWT } from "google-auth-library";
 import json2md from "json2md";
 import { Env } from "../types";
 
@@ -10,6 +11,17 @@ export class GoogleSheets {
   }
 
   /**
+   * Create JWT auth instance for service account authentication
+   */
+  private createAuth(): JWT {
+    return new JWT({
+      email: this.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      key: this.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, "\n"),
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+    });
+  }
+
+  /**
    * Collect markdown from every sheet in the spreadsheet
    * @param spreadSheetId - The ID of the Google Sheets document (optional, falls back to environment variable)
    * @returns Promise<string> - All sheets formatted as markdown
@@ -17,9 +29,8 @@ export class GoogleSheets {
   async collectAllSheetsAsMarkdown(spreadSheetId?: string): Promise<string> {
     try {
       const documentId = spreadSheetId || this.env.GOOGLE_SHEETS_DOCUMENT_ID;
-      const doc = new GoogleSpreadsheet(documentId, {
-        apiKey: this.env.GOOGLE_SHEETS_API_KEY,
-      });
+      const auth = this.createAuth();
+      const doc = new GoogleSpreadsheet(documentId, auth);
 
       await doc.loadInfo();
 
@@ -89,9 +100,8 @@ export class GoogleSheets {
   ): Promise<string> {
     try {
       const documentId = spreadSheetId || this.env.GOOGLE_SHEETS_DOCUMENT_ID;
-      const doc = new GoogleSpreadsheet(documentId, {
-        apiKey: this.env.GOOGLE_SHEETS_API_KEY,
-      });
+      const auth = this.createAuth();
+      const doc = new GoogleSpreadsheet(documentId, auth);
 
       await doc.loadInfo();
 

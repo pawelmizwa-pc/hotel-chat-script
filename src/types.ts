@@ -63,8 +63,9 @@ export interface Env {
   LANGFUSE_SECRET_KEY: string;
   LANGFUSE_PUBLIC_KEY: string;
 
-  // Google Sheets
-  GOOGLE_SHEETS_API_KEY: string;
+  // Google Sheets - Service Account
+  GOOGLE_SERVICE_ACCOUNT_EMAIL: string;
+  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: string;
   GOOGLE_SHEETS_DOCUMENT_ID: string;
 
   // Gmail SMTP
