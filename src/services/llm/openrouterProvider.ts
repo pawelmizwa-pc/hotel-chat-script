@@ -10,7 +10,7 @@ import {
 export class OpenRouterProvider extends BaseLLMProvider {
   readonly type = "openrouter" as const;
 
-  private openai: OpenAI;
+  private openai!: OpenAI;
   private defaultApiKey: string;
 
   constructor(env: Env) {

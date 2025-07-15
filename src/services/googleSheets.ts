@@ -1,4 +1,5 @@
 import { GoogleSpreadsheet } from "google-spreadsheet";
+// @ts-ignore
 import json2md from "json2md";
 import { Env } from "../types";
 
@@ -33,7 +34,10 @@ export class GoogleSheets {
     const unsignedToken = `${encodedHeader}.${encodedPayload}`;
 
     // Import the private key
-    const privateKeyPem = this.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, '\n');
+    const privateKeyPem = this.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(
+      /\\n/g,
+      "\n"
+    );
     const privateKey = await this.importPrivateKey(privateKeyPem);
 
     // Sign the token
@@ -54,12 +58,14 @@ export class GoogleSheets {
   private async importPrivateKey(privateKeyPem: string): Promise<CryptoKey> {
     // Remove PEM header/footer and whitespace
     const privateKeyData = privateKeyPem
-      .replace(/-----BEGIN PRIVATE KEY-----/, '')
-      .replace(/-----END PRIVATE KEY-----/, '')
-      .replace(/\s+/g, '');
+      .replace(/-----BEGIN PRIVATE KEY-----/, "")
+      .replace(/-----END PRIVATE KEY-----/, "")
+      .replace(/\s+/g, "");
 
     // Convert base64 to ArrayBuffer
-    const binaryData = Uint8Array.from(atob(privateKeyData), c => c.charCodeAt(0));
+    const binaryData = Uint8Array.from(atob(privateKeyData), (c) =>
+      c.charCodeAt(0)
+    );
 
     return await crypto.subtle.importKey(
       "pkcs8",
@@ -78,19 +84,18 @@ export class GoogleSheets {
    */
   private base64UrlEncode(data: string | ArrayBuffer): string {
     let base64: string;
-    
-    if (typeof data === 'string') {
+
+    if (typeof data === "string") {
       base64 = btoa(data);
     } else {
       const bytes = new Uint8Array(data);
-      const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+      const binary = Array.from(bytes, (byte) =>
+        String.fromCharCode(byte)
+      ).join("");
       base64 = btoa(binary);
     }
 
-    return base64
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+    return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
   }
 
   /**
@@ -98,7 +103,7 @@ export class GoogleSheets {
    */
   private async getAccessToken(): Promise<string> {
     const jwt = await this.createJWT();
-    
+
     const response = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: {
@@ -112,19 +117,23 @@ export class GoogleSheets {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Failed to get access token: ${response.status} ${errorText}`);
+      throw new Error(
+        `Failed to get access token: ${response.status} ${errorText}`
+      );
     }
 
-    const data = await response.json() as { access_token: string };
+    const data = (await response.json()) as { access_token: string };
     return data.access_token;
   }
 
   /**
    * Create GoogleSpreadsheet instance with service account authentication
    */
-  private async createAuthenticatedDoc(documentId: string): Promise<GoogleSpreadsheet> {
+  private async createAuthenticatedDoc(
+    documentId: string
+  ): Promise<GoogleSpreadsheet> {
     const accessToken = await this.getAccessToken();
-    
+
     return new GoogleSpreadsheet(documentId, {
       token: accessToken,
     });

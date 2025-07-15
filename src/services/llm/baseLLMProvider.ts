@@ -1,7 +1,12 @@
-import { LLMProvider, LLMCompletionOptions, ChatMessage } from "../../types";
+import {
+  LLMProvider,
+  LLMCompletionOptions,
+  ChatMessage,
+  LLMProviderType,
+} from "../../types";
 
 export abstract class BaseLLMProvider implements LLMProvider {
-  abstract readonly type: string;
+  abstract readonly type: LLMProviderType;
   protected tenantApiKey?: string;
 
   /**

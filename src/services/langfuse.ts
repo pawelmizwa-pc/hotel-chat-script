@@ -4,7 +4,7 @@ import {
   LangfuseTraceClient,
   LangfuseGenerationClient,
 } from "langfuse";
-import { Env, LangfusePrompt, UTMTracking, ButtonInteraction } from "../types";
+import { Env, LangfusePrompt, UTMTracking } from "../types";
 import { extractModelNameForLangfuse } from "../utils/llmResultParser";
 import { LangfuseUsageDetails } from "../utils/usageTracker";
 
@@ -26,7 +26,7 @@ export class LangfuseService {
     sessionId: string,
     input: any,
     utmTracking?: UTMTracking,
-    buttonInteraction?: ButtonInteraction
+    buttonInteraction?: any
   ) {
     const traceData: any = {
       sessionId,
@@ -200,7 +200,7 @@ export class LangfuseService {
    */
   logButtonInteraction(
     trace: LangfuseTraceClient,
-    buttonInteraction: ButtonInteraction,
+    buttonInteraction: any,
     responseGenerated?: boolean
   ): LangfuseSpanClient {
     const interactionEvent = trace.span({

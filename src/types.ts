@@ -11,6 +11,17 @@ export interface UTMTracking {
   [key: string]: string | undefined; // Allow additional UTM parameters
 }
 
+export interface ButtonInteraction {
+  messageType: "dynamic_button" | "quick_reply" | "persistent_menu";
+  buttonClicked: boolean;
+  buttonType: "quick_reply" | "postback" | "web_url" | "call" | "upsell";
+  buttonTitle: string;
+  buttonPayload?: string;
+  isUpsell: boolean;
+  clickTimestamp?: string;
+  previousMessageId?: string;
+}
+
 export interface ChatRequest {
   sessionId: string;
   message: string;
@@ -19,6 +30,7 @@ export interface ChatRequest {
   tenantId?: string;
   utmTracking?: UTMTracking;
   hasUTMData?: boolean;
+  buttonInteraction?: ButtonInteraction;
   messageType: "dynamic_button" | "quick_reply" | "persistent_menu";
   buttonClicked: boolean;
   buttonType: "quick_reply" | "postback" | "web_url" | "call" | "upsell";
