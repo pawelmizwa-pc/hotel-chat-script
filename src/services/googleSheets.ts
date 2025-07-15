@@ -1,5 +1,4 @@
 import { GoogleSpreadsheet } from "google-spreadsheet";
-import { JWT } from "google-auth-library";
 import json2md from "json2md";
 import { Env } from "../types";
 
@@ -11,13 +10,123 @@ export class GoogleSheets {
   }
 
   /**
-   * Create JWT auth instance for service account authentication
+   * Create a JWT token for Google service account authentication using Web Crypto API
+   * This is compatible with Cloudflare Workers environment
    */
-  private createAuth(): JWT {
-    return new JWT({
-      email: this.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      key: this.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, "\n"),
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
+  private async createJWT(): Promise<string> {
+    const header = {
+      alg: "RS256",
+      typ: "JWT",
+    };
+
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      iss: this.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      scope: "https://www.googleapis.com/auth/spreadsheets",
+      aud: "https://oauth2.googleapis.com/token",
+      exp: now + 3600, // 1 hour
+      iat: now,
+    };
+
+    const encodedHeader = this.base64UrlEncode(JSON.stringify(header));
+    const encodedPayload = this.base64UrlEncode(JSON.stringify(payload));
+    const unsignedToken = `${encodedHeader}.${encodedPayload}`;
+
+    // Import the private key
+    const privateKeyPem = this.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, '\n');
+    const privateKey = await this.importPrivateKey(privateKeyPem);
+
+    // Sign the token
+    const encoder = new TextEncoder();
+    const signature = await crypto.subtle.sign(
+      "RSASSA-PKCS1-v1_5",
+      privateKey,
+      encoder.encode(unsignedToken)
+    );
+
+    const encodedSignature = this.base64UrlEncode(signature);
+    return `${unsignedToken}.${encodedSignature}`;
+  }
+
+  /**
+   * Import private key for signing
+   */
+  private async importPrivateKey(privateKeyPem: string): Promise<CryptoKey> {
+    // Remove PEM header/footer and whitespace
+    const privateKeyData = privateKeyPem
+      .replace(/-----BEGIN PRIVATE KEY-----/, '')
+      .replace(/-----END PRIVATE KEY-----/, '')
+      .replace(/\s+/g, '');
+
+    // Convert base64 to ArrayBuffer
+    const binaryData = Uint8Array.from(atob(privateKeyData), c => c.charCodeAt(0));
+
+    return await crypto.subtle.importKey(
+      "pkcs8",
+      binaryData,
+      {
+        name: "RSASSA-PKCS1-v1_5",
+        hash: "SHA-256",
+      },
+      false,
+      ["sign"]
+    );
+  }
+
+  /**
+   * Base64 URL encode
+   */
+  private base64UrlEncode(data: string | ArrayBuffer): string {
+    let base64: string;
+    
+    if (typeof data === 'string') {
+      base64 = btoa(data);
+    } else {
+      const bytes = new Uint8Array(data);
+      const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+      base64 = btoa(binary);
+    }
+
+    return base64
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  }
+
+  /**
+   * Get access token using service account JWT
+   */
+  private async getAccessToken(): Promise<string> {
+    const jwt = await this.createJWT();
+    
+    const response = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion: jwt,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to get access token: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json() as { access_token: string };
+    return data.access_token;
+  }
+
+  /**
+   * Create GoogleSpreadsheet instance with service account authentication
+   */
+  private async createAuthenticatedDoc(documentId: string): Promise<GoogleSpreadsheet> {
+    const accessToken = await this.getAccessToken();
+    
+    return new GoogleSpreadsheet(documentId, {
+      token: accessToken,
     });
   }
 
@@ -29,8 +138,7 @@ export class GoogleSheets {
   async collectAllSheetsAsMarkdown(spreadSheetId?: string): Promise<string> {
     try {
       const documentId = spreadSheetId || this.env.GOOGLE_SHEETS_DOCUMENT_ID;
-      const auth = this.createAuth();
-      const doc = new GoogleSpreadsheet(documentId, auth);
+      const doc = await this.createAuthenticatedDoc(documentId);
 
       await doc.loadInfo();
 
@@ -100,8 +208,7 @@ export class GoogleSheets {
   ): Promise<string> {
     try {
       const documentId = spreadSheetId || this.env.GOOGLE_SHEETS_DOCUMENT_ID;
-      const auth = this.createAuth();
-      const doc = new GoogleSpreadsheet(documentId, auth);
+      const doc = await this.createAuthenticatedDoc(documentId);
 
       await doc.loadInfo();
 
