@@ -4,7 +4,7 @@ import {
   LangfuseTraceClient,
   LangfuseGenerationClient,
 } from "langfuse";
-import { Env, LangfusePrompt, UTMTracking } from "../types";
+import { Env, LangfusePrompt, UTMTracking, ButtonInteraction } from "../types";
 import { extractModelNameForLangfuse } from "../utils/llmResultParser";
 import { LangfuseUsageDetails } from "../utils/usageTracker";
 
@@ -20,9 +20,14 @@ export class LangfuseService {
   }
 
   /**
-   * Create a trace for the entire request with optional UTM tracking
+   * Create a trace for the entire request with optional UTM tracking and button interaction
    */
-  createTrace(sessionId: string, input: any, utmTracking?: UTMTracking) {
+  createTrace(
+    sessionId: string,
+    input: any,
+    utmTracking?: UTMTracking,
+    buttonInteraction?: ButtonInteraction
+  ) {
     const traceData: any = {
       sessionId,
       userId: sessionId,
@@ -30,16 +35,18 @@ export class LangfuseService {
       input,
     };
 
+    // Initialize metadata and tags
+    traceData.metadata = {};
+    traceData.tags = [];
+
     // Add UTM tracking data to trace metadata if available
     if (utmTracking) {
-      traceData.metadata = {
-        utmTracking,
-        hasMarketingData: true,
-        trackingTimestamp: new Date().toISOString(),
-      };
+      traceData.metadata.utmTracking = utmTracking;
+      traceData.metadata.hasMarketingData = true;
+      traceData.metadata.trackingTimestamp = new Date().toISOString();
 
       // Add UTM data as tags for easier filtering in Langfuse
-      traceData.tags = [
+      const utmTags = [
         utmTracking.utm_source && `source:${utmTracking.utm_source}`,
         utmTracking.utm_medium && `medium:${utmTracking.utm_medium}`,
         utmTracking.utm_campaign && `campaign:${utmTracking.utm_campaign}`,
@@ -48,7 +55,29 @@ export class LangfuseService {
         utmTracking.gclid && `gclid:present`,
         utmTracking.fbclid && `fbclid:present`,
         utmTracking.msclkid && `msclkid:present`,
-      ].filter(Boolean); // Remove falsy values
+      ].filter(Boolean);
+
+      traceData.tags.push(...utmTags);
+    }
+
+    // Add button interaction data if available
+    if (buttonInteraction && buttonInteraction.buttonClicked) {
+      traceData.metadata.buttonInteraction = buttonInteraction;
+      traceData.metadata.hasButtonInteraction = true;
+      traceData.metadata.interactionTimestamp = new Date().toISOString();
+
+      // Add button interaction tags for easier filtering
+      const buttonTags = [
+        `button-clicked:true`,
+        `button-type:${buttonInteraction.buttonType}`,
+        `message-type:${buttonInteraction.messageType}`,
+        buttonInteraction.isUpsell && `upsell:true`,
+        `button-title:${buttonInteraction.buttonTitle
+          .replace(/[^a-zA-Z0-9]/g, "-")
+          .toLowerCase()}`,
+      ].filter(Boolean);
+
+      traceData.tags.push(...buttonTags);
     }
 
     return this.langfuse.trace(traceData);
@@ -162,6 +191,106 @@ export class LangfuseService {
         success: true,
         conversionType,
         value: conversionValue,
+      },
+    });
+  }
+
+  /**
+   * Log button interaction events with context
+   */
+  logButtonInteraction(
+    trace: LangfuseTraceClient,
+    buttonInteraction: ButtonInteraction,
+    responseGenerated?: boolean
+  ): LangfuseSpanClient {
+    const interactionEvent = trace.span({
+      name: `button-interaction-${buttonInteraction.buttonType}`,
+      input: {
+        buttonTitle: buttonInteraction.buttonTitle,
+        buttonType: buttonInteraction.buttonType,
+        messageType: buttonInteraction.messageType,
+        buttonPayload: buttonInteraction.buttonPayload,
+        isUpsell: buttonInteraction.isUpsell,
+      },
+      metadata: {
+        eventType: "button-interaction",
+        buttonClicked: buttonInteraction.buttonClicked,
+        clickTimestamp:
+          buttonInteraction.clickTimestamp || new Date().toISOString(),
+        previousMessageId: buttonInteraction.previousMessageId,
+        responseGenerated: responseGenerated || false,
+      },
+    });
+
+    interactionEvent.end({
+      output: {
+        interactionProcessed: true,
+        buttonTitle: buttonInteraction.buttonTitle,
+        isUpsell: buttonInteraction.isUpsell,
+      },
+    });
+
+    return interactionEvent;
+  }
+
+  /**
+   * Log upsell events when upsell buttons are clicked
+   */
+  logUpsellEvent(
+    trace: LangfuseTraceClient,
+    upsellData: {
+      buttonTitle: string;
+      upsellType: string;
+      potentialValue?: number;
+    },
+    utmContext?: UTMTracking
+  ): void {
+    const upsellEvent = this.createMarketingEvent(
+      trace,
+      `upsell-${upsellData.upsellType}`,
+      {
+        buttonTitle: upsellData.buttonTitle,
+        upsellType: upsellData.upsellType,
+        potentialValue: upsellData.potentialValue,
+        upsellTimestamp: new Date().toISOString(),
+      },
+      utmContext
+    );
+
+    upsellEvent.end({
+      output: {
+        success: true,
+        upsellType: upsellData.upsellType,
+        potentialValue: upsellData.potentialValue,
+      },
+    });
+  }
+
+  /**
+   * Track button engagement metrics
+   */
+  trackButtonEngagement(
+    trace: LangfuseTraceClient,
+    engagementData: {
+      totalButtons: number;
+      buttonsClicked: number;
+      engagementRate: number;
+      sessionDuration?: number;
+    }
+  ): void {
+    const engagementEvent = trace.span({
+      name: "button-engagement-metrics",
+      input: engagementData,
+      metadata: {
+        eventType: "engagement-analysis",
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    engagementEvent.end({
+      output: {
+        engagementAnalysis: engagementData,
+        highEngagement: engagementData.engagementRate > 0.5,
       },
     });
   }

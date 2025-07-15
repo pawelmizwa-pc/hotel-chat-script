@@ -19,6 +19,12 @@ export interface ChatRequest {
   tenantId?: string;
   utmTracking?: UTMTracking;
   hasUTMData?: boolean;
+  messageType: "dynamic_button" | "quick_reply" | "persistent_menu";
+  buttonClicked: boolean;
+  buttonType: "quick_reply" | "postback" | "web_url" | "call" | "upsell";
+  buttonTitle: string;
+  buttonPayload?: string;
+  isUpsell: boolean;
 }
 
 export interface ChatResponse {

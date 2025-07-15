@@ -15,6 +15,65 @@
       "gclid": "TeSter-123_example_gclid"
     }
   },
+  "example_button_interaction_with_utm": {
+    "message": "Show me spa services",
+    "sessionId": "session_124",
+    "language": "en",
+    "tenantId": "hotel-smile",
+    "hasUTMData": true,
+    "utmTracking": {
+      "utm_source": "google",
+      "utm_medium": "cpc",
+      "utm_campaign": "summer_spa_promotion"
+    },
+    "buttonInteraction": {
+      "messageType": "dynamic_button",
+      "buttonClicked": true,
+      "buttonType": "quick_reply",
+      "buttonTitle": "🧖‍♀️ SPA Services",
+      "buttonPayload": "spa_services_menu",
+      "isUpsell": false,
+      "clickTimestamp": "2024-01-15T14:30:00Z",
+      "previousMessageId": "msg_123"
+    }
+  },
+  "example_upsell_button": {
+    "message": "Yes, I want the premium package",
+    "sessionId": "session_125",
+    "language": "en",
+    "tenantId": "hotel-smile",
+    "hasUTMData": true,
+    "utmTracking": {
+      "utm_source": "email",
+      "utm_medium": "newsletter",
+      "utm_campaign": "premium_spa_upsell"
+    },
+    "buttonInteraction": {
+      "messageType": "dynamic_button",
+      "buttonClicked": true,
+      "buttonType": "upsell",
+      "buttonTitle": "✨ Premium SPA Package",
+      "buttonPayload": "premium_spa_package",
+      "isUpsell": true,
+      "clickTimestamp": "2024-01-15T15:45:00Z",
+      "previousMessageId": "msg_124"
+    }
+  },
+  "example_restaurant_button": {
+    "message": "Show menu please",
+    "sessionId": "session_126",
+    "language": "en",
+    "tenantId": "hotel-smile",
+    "buttonInteraction": {
+      "messageType": "dynamic_button",
+      "buttonClicked": true,
+      "buttonType": "quick_reply",
+      "buttonTitle": "🍽️ Restaurant Menu",
+      "buttonPayload": "restaurant_menu",
+      "isUpsell": false,
+      "clickTimestamp": "2024-01-15T12:15:00Z"
+    }
+  },
   "example_request_facebook": {
     "message": "What dining options do you have?",
     "sessionId": "session_456",
