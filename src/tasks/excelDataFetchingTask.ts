@@ -26,11 +26,19 @@ export interface ExcelDataFetchingOutput {
   errors: string[];
 }
 
+interface GoogleAPIError extends Error {
+  status?: number;
+  code?: number;
+  details?: string;
+}
+
 export class ExcelDataFetchingTask {
   private langfuseService: LangfuseService;
   private googleSheets: GoogleSheets;
   private tenantKnowledgeCache: KVNamespace;
   private readonly CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  private readonly MAX_RETRY_ATTEMPTS = 1;
+  private readonly RETRY_DELAY_BASE_MS = 1000; // 1 second base delay
 
   constructor(
     langfuseService: LangfuseService,
@@ -40,6 +48,100 @@ export class ExcelDataFetchingTask {
     this.langfuseService = langfuseService;
     this.googleSheets = googleSheets;
     this.tenantKnowledgeCache = tenantKnowledgeCache;
+  }
+
+  /**
+   * Check if error is a Google API error
+   * @param error The error to check
+   * @returns boolean
+   */
+  private isGoogleAPIError(error: any): error is GoogleAPIError {
+    if (!error) return false;
+
+    const errorMessage = error.message || String(error);
+    const statusCode = error.status || error.code;
+
+    // Check for Google API specific error patterns
+    return (
+      errorMessage.includes("Google API error") ||
+      errorMessage.includes("Google Sheets API") ||
+      errorMessage.includes("googleapis.com") ||
+      statusCode === 403 ||
+      statusCode === 429 ||
+      statusCode === 500 ||
+      statusCode === 502 ||
+      statusCode === 503 ||
+      statusCode === 504
+    );
+  }
+
+  /**
+   * Check if error is retryable
+   * @param error The error to check
+   * @returns boolean
+   */
+  private isRetryableError(error: any): boolean {
+    if (!this.isGoogleAPIError(error)) return false;
+
+    const errorMessage = error.message || String(error);
+    const statusCode = error.status || error.code;
+
+    // Don't retry on authentication/permission errors
+    if (statusCode === 401 || statusCode === 403) {
+      // However, 403 can sometimes be temporary quota issues, so retry once
+      return errorMessage.includes("quota") || errorMessage.includes("limit");
+    }
+
+    // Retry on server errors and rate limits
+    return (
+      statusCode === 429 || (statusCode !== undefined && statusCode >= 500)
+    );
+  }
+
+  /**
+   * Create a user-friendly error message for Google API errors
+   * @param error The error to format
+   * @param sheetName The sheet name
+   * @returns string Formatted error message
+   */
+  private formatGoogleAPIError(error: any, sheetName: string): string {
+    const errorMessage = error.message || String(error);
+
+    // Handle specific Google API configuration errors
+    if (
+      errorMessage.includes("Google Sheets API has not been used") ||
+      errorMessage.includes("it is disabled")
+    ) {
+      return `Google Sheets API is not enabled for this project. Please enable it in the Google Cloud Console and try again. (Sheet: ${sheetName})`;
+    }
+
+    if (errorMessage.includes("403") || errorMessage.includes("Forbidden")) {
+      return `Access forbidden to Google Sheets. Please check API permissions and quota limits. (Sheet: ${sheetName})`;
+    }
+
+    if (errorMessage.includes("401") || errorMessage.includes("Unauthorized")) {
+      return `Google Sheets authentication failed. Please check API credentials. (Sheet: ${sheetName})`;
+    }
+
+    if (errorMessage.includes("quota") || errorMessage.includes("limit")) {
+      return `Google Sheets API quota exceeded. Please try again later. (Sheet: ${sheetName})`;
+    }
+
+    if (errorMessage.includes("429")) {
+      return `Google Sheets API rate limit exceeded. Please try again later. (Sheet: ${sheetName})`;
+    }
+
+    // Generic Google API error
+    return `Google API error for sheet "${sheetName}": ${errorMessage}`;
+  }
+
+  /**
+   * Sleep for specified milliseconds
+   * @param ms Milliseconds to sleep
+   * @returns Promise<void>
+   */
+  private async sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**
@@ -247,14 +349,16 @@ export class ExcelDataFetchingTask {
   }
 
   /**
-   * Fetch sheet data from Google Sheets
+   * Fetch sheet data from Google Sheets with retry logic
    * @param spreadsheetId The spreadsheet ID
    * @param sheetName The sheet name
+   * @param retryAttempt Current retry attempt (for internal use)
    * @returns Promise<string>
    */
   private async fetchSheetFromGoogleSheets(
     spreadsheetId: string,
-    sheetName: string
+    sheetName: string,
+    retryAttempt: number = 0
   ): Promise<string> {
     try {
       return await this.googleSheets.collectSheetAsMarkdown(
@@ -263,9 +367,33 @@ export class ExcelDataFetchingTask {
       );
     } catch (error) {
       console.error(
-        `Error fetching sheet "${sheetName}" from Google Sheets:`,
+        `Error fetching sheet "${sheetName}" from Google Sheets (attempt ${
+          retryAttempt + 1
+        }):`,
         error
       );
+
+      // If this is a retryable error and we haven't exceeded max attempts
+      if (
+        this.isRetryableError(error) &&
+        retryAttempt < this.MAX_RETRY_ATTEMPTS
+      ) {
+        const delayMs = this.RETRY_DELAY_BASE_MS * Math.pow(2, retryAttempt); // Exponential backoff
+        console.log(
+          `Retrying in ${delayMs}ms... (attempt ${retryAttempt + 1}/${
+            this.MAX_RETRY_ATTEMPTS
+          })`
+        );
+
+        await this.sleep(delayMs);
+        return this.fetchSheetFromGoogleSheets(
+          spreadsheetId,
+          sheetName,
+          retryAttempt + 1
+        );
+      }
+
+      // If not retryable or max attempts exceeded, throw the error
       throw error;
     }
   }
@@ -376,11 +504,67 @@ export class ExcelDataFetchingTask {
                 sheetData
               );
             } catch (googleSheetsError) {
-              // If Google Sheets fails and we have expired cached data, use it as fallback
+              // Enhanced error handling for Google API errors
+              const isGoogleAPIError = this.isGoogleAPIError(googleSheetsError);
+
+              if (isGoogleAPIError) {
+                console.warn(
+                  `Google API error for ${input.tenantId}:${sheet.sheet_name}:`,
+                  googleSheetsError
+                );
+
+                // Log Google API error details to span
+                if (span) {
+                  try {
+                    span.update({
+                      metadata: {
+                        googleAPIError: {
+                          message:
+                            googleSheetsError instanceof Error
+                              ? googleSheetsError.message
+                              : String(googleSheetsError),
+                          task: "ExcelDataFetchingTask",
+                          sheetName: sheet.sheet_name,
+                          tenantId: input.tenantId,
+                          isRetryable: this.isRetryableError(googleSheetsError),
+                          timestamp: new Date().toISOString(),
+                        },
+                      },
+                    });
+                  } catch (logError) {
+                    console.warn(
+                      "Failed to log Google API error to Langfuse:",
+                      logError
+                    );
+                  }
+                }
+              }
+
+              // Always try to use expired cached data as fallback after retry fails
               if (cachedData && cachedData.isExpired) {
                 sheetData = cachedData.data;
                 console.warn(
-                  `Using expired cached data for ${input.tenantId}:${sheet.sheet_name} due to Google Sheets error`
+                  `Using expired cached data for ${input.tenantId}:${
+                    sheet.sheet_name
+                  } due to fetch error after retry (${
+                    isGoogleAPIError ? "Google API error" : "fetch error"
+                  })`
+                );
+
+                // Add warning to errors but don't fail completely
+                const formattedError = isGoogleAPIError
+                  ? this.formatGoogleAPIError(
+                      googleSheetsError,
+                      sheet.sheet_name
+                    )
+                  : `${
+                      googleSheetsError instanceof Error
+                        ? googleSheetsError.message
+                        : String(googleSheetsError)
+                    }`;
+
+                errors.push(
+                  `Warning: Using expired cached data for "${sheet.sheet_name}" due to error after retry: ${formattedError}`
                 );
               } else {
                 throw googleSheetsError;
@@ -391,7 +575,11 @@ export class ExcelDataFetchingTask {
           excelDataParts.push(`## ${sheet.sheet_name}\n${sheetData.trim()}`);
           fetchedSheets.push(sheet.sheet_name);
         } catch (error) {
-          const errorMessage = `Error fetching sheet "${sheet.sheet_name}": ${error}`;
+          const isGoogleAPIError = this.isGoogleAPIError(error);
+          const errorMessage = isGoogleAPIError
+            ? this.formatGoogleAPIError(error, sheet.sheet_name)
+            : `Error fetching sheet "${sheet.sheet_name}": ${error}`;
+
           errors.push(errorMessage);
           console.error(errorMessage);
 
@@ -405,6 +593,7 @@ export class ExcelDataFetchingTask {
                       error instanceof Error ? error.message : String(error),
                     task: "ExcelDataFetchingTask",
                     sheetName: sheet.sheet_name,
+                    isGoogleAPIError,
                     timestamp: new Date().toISOString(),
                   },
                 },
@@ -435,6 +624,9 @@ export class ExcelDataFetchingTask {
           metadata: {
             fetchedSheetsCount: fetchedSheets.length,
             errorsCount: errors.length,
+            hasGoogleAPIErrors: errors.some((error) =>
+              error.includes("Google API error")
+            ),
           },
         });
       }

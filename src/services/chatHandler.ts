@@ -10,6 +10,7 @@ import { LangfuseService } from "./langfuse";
 import { LLMService } from "./llm";
 import { GoogleSheets } from "./googleSheets";
 import { EmailService } from "./emailService";
+import { CostDetails, DetailedUsage } from "../utils/usageTracker";
 
 export class ChatHandler {
   private langfuseService: LangfuseService;
@@ -174,9 +175,33 @@ export class ChatHandler {
       // Don't fail the request if memory saving fails
     }
 
+    // Calculate aggregate usage and costs
+    const allTaskUsages = [
+      firstResponse.usage,
+      secondResponse.usage,
+      thirdResponse.usage,
+      excelSheetMatchingResult.usage,
+    ].filter(Boolean);
+
+    const aggregateUsage: DetailedUsage = {
+      input: allTaskUsages.reduce(
+        (sum, usage) => sum + (usage?.promptTokens || 0),
+        0
+      ),
+      output: allTaskUsages.reduce(
+        (sum, usage) => sum + (usage?.completionTokens || 0),
+        0
+      ),
+      total: allTaskUsages.reduce(
+        (sum, usage) => sum + (usage?.totalTokens || 0),
+        0
+      ),
+    };
+
     // End the trace with the final response and usage summary
     trace.update({
       output: response,
+      usage: aggregateUsage,
       metadata: {
         tenantId,
         sessionId,
@@ -184,6 +209,15 @@ export class ChatHandler {
         detectedLanguage,
         upSellButtons: buttons.filter((button) => button.isUpsell === true)
           .length,
+        taskCount: 4, // guestService, buttons, email, excelSheetMatching
+        totalTokensUsed: aggregateUsage.total,
+        tasksCompleted: [
+          "GuestServiceTask",
+          "ButtonsTask",
+          "EmailTask",
+          "ExcelSheetMatchingTask",
+          "ExcelDataFetchingTask",
+        ],
       },
     });
 

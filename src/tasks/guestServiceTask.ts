@@ -5,6 +5,7 @@ import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
 import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
+import { convertToDetailedUsage, logUsageDetails } from "../utils/usageTracker";
 
 export interface GuestServiceTaskInput {
   userMessage: string;
@@ -121,12 +122,24 @@ export class GuestServiceTask {
       traceId: input.sessionId,
     };
 
-    // End generation with output and usage
+    // End generation with detailed usage tracking
     if (generation) {
-      generation.end({
-        output: result.content,
-        usage: result.usage,
-      });
+      const detailedUsage = convertToDetailedUsage(
+        result.usage,
+        response.model,
+        response.provider
+      );
+
+      if (detailedUsage) {
+        logUsageDetails("GuestServiceTask", detailedUsage, response.model);
+        this.langfuseService.endGenerationWithUsage(
+          generation,
+          result.content,
+          detailedUsage
+        );
+      } else {
+        generation.end({ output: result.content });
+      }
     }
 
     return result;

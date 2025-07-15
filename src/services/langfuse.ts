@@ -6,6 +6,7 @@ import {
 } from "langfuse";
 import { Env, LangfusePrompt } from "../types";
 import { extractModelNameForLangfuse } from "../utils/llmResultParser";
+import { LangfuseUsageDetails } from "../utils/usageTracker";
 
 export class LangfuseService {
   private langfuse: Langfuse;
@@ -58,6 +59,31 @@ export class LangfuseService {
       input,
       model: model ? extractModelNameForLangfuse(model) : undefined,
     });
+  }
+
+  /**
+   * End a generation with detailed usage tracking
+   */
+  endGenerationWithUsage(
+    generation: LangfuseGenerationClient,
+    output: any,
+    usageDetails?: LangfuseUsageDetails
+  ): void {
+    if (usageDetails) {
+      generation.end({
+        output,
+        usage: {
+          input: usageDetails.usageDetails.input,
+          output: usageDetails.usageDetails.output,
+          total: usageDetails.usageDetails.total,
+          inputCost: usageDetails.costDetails.input,
+          outputCost: usageDetails.costDetails.output,
+          totalCost: usageDetails.costDetails.total,
+        },
+      });
+    } else {
+      generation.end({ output });
+    }
   }
 
   /**

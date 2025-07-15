@@ -6,6 +6,7 @@ import { parseLLMResult } from "../utils/llmResultParser";
 import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
 import { formatConversationHistory } from "../utils/format";
+import { convertToDetailedUsage, logUsageDetails } from "../utils/usageTracker";
 
 export interface ExcelSheetMatchingInput {
   userMessage: string;
@@ -177,12 +178,28 @@ export class ExcelSheetMatchingTask {
       usage: response.usage,
     };
 
-    // End generation with output and usage
+    // End generation with detailed usage tracking
     if (generation) {
-      generation.end({
-        output: result.content,
-        usage: result.usage,
-      });
+      const detailedUsage = convertToDetailedUsage(
+        result.usage,
+        response.model,
+        response.provider
+      );
+
+      if (detailedUsage) {
+        logUsageDetails(
+          "ExcelSheetMatchingTask",
+          detailedUsage,
+          response.model
+        );
+        this.langfuseService.endGenerationWithUsage(
+          generation,
+          result.content,
+          detailedUsage
+        );
+      } else {
+        generation.end({ output: result.content });
+      }
     }
 
     return result;
