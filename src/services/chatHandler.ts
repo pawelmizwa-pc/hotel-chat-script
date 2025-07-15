@@ -29,10 +29,15 @@ export class ChatHandler {
   }
 
   async processChat(chatRequest: ChatRequest): Promise<ChatResponse> {
+    const tenantId = chatRequest.tenantId || "default";
+    const sessionId = chatRequest.sessionId;
+    const language = chatRequest.language;
+    const userMessage = chatRequest.message;
+
     // Create Langfuse trace for the entire request
-    const trace = this.langfuseService.createTrace(chatRequest.sessionId, {
-      userMessage: chatRequest.message,
-      language: chatRequest.language,
+    const trace = this.langfuseService.createTrace(sessionId, {
+      userMessage,
+      language,
     });
 
     // Initialize by collecting data from all services
@@ -41,11 +46,11 @@ export class ChatHandler {
       this.memoryService,
       this.env.TENAT_CONFIG
     );
-    const collectedData = await dataCollectionTask.collectData(
-      chatRequest.sessionId,
-      chatRequest.tenantId || "default",
-      trace
-    );
+    const collectedData = await dataCollectionTask.collectData({
+      sessionId,
+      tenantId,
+      trace,
+    });
 
     // Run Excel sheet matching task
     const excelSheetMatchingTask = new ExcelSheetMatchingTask(
@@ -53,9 +58,9 @@ export class ChatHandler {
       this.langfuseService
     );
     const excelSheetMatchingResult = await excelSheetMatchingTask.execute({
-      userMessage: chatRequest.message,
+      userMessage,
       excelConfig: collectedData.tenantConfig?.["excel-config"] ?? "",
-      sessionId: chatRequest.sessionId,
+      sessionId,
       excelPrompt: collectedData.prompts.excel || null,
       llmConfig: collectedData.configs.excel,
       sessionHistory: collectedData.sessionHistory,
@@ -73,8 +78,8 @@ export class ChatHandler {
     );
     const excelDataResult = await excelDataFetchingTask.execute({
       recommendedSheets,
-      tenantId: chatRequest.tenantId || "default",
-      sessionId: chatRequest.sessionId,
+      tenantId,
+      sessionId,
       spreadsheetId: collectedData.tenantConfig?.spreadsheetId,
       trace,
     });
@@ -88,39 +93,40 @@ export class ChatHandler {
     const emailTask = new EmailTask(
       this.langfuseService,
       this.llmService,
-      this.emailService
+      this.emailService,
+      this.memoryService
     );
 
     // Wait for all tasks to complete using Promise.all
     const [firstResponse, secondResponse, thirdResponse] = await Promise.all([
       guestServiceTask.execute({
-        userMessage: chatRequest.message,
+        userMessage,
         sessionHistory: collectedData.sessionHistory,
         excelData: excelDataResult.excelData,
         guestServicePrompt: collectedData.prompts.guestService,
         tenantConfig: collectedData.tenantConfig,
-        sessionId: chatRequest.sessionId,
+        sessionId,
         llmConfig: collectedData.configs.guestService,
         trace,
       }),
       buttonsTask.execute({
-        userMessage: chatRequest.message,
+        userMessage,
         excelData: excelDataResult.excelData,
         buttonsPrompt: collectedData.prompts.buttons,
         tenantConfig: collectedData.tenantConfig,
-        sessionId: chatRequest.sessionId,
+        sessionId,
         llmConfig: collectedData.configs.buttons,
         sessionHistory: collectedData.sessionHistory,
+        previousMessageLanguage: language,
         trace,
       }),
       emailTask.execute({
-        userMessage: chatRequest.message,
+        userMessage,
         excelData: excelDataResult.excelData,
         emailToolPrompt: collectedData.prompts.emailTool,
         tenantConfig: collectedData.tenantConfig,
-        sessionHistory: collectedData.sessionHistory,
-        sessionId: chatRequest.sessionId,
-        tenantId: chatRequest.tenantId,
+        sessionId,
+        tenantId,
         llmConfig: collectedData.configs.emailTool,
         trace,
       }),
@@ -138,7 +144,7 @@ export class ChatHandler {
     // Create the response structure
     const response: ChatResponse = {
       recipient: {
-        id: chatRequest.sessionId,
+        id: sessionId,
       },
       messaging_type: "RESPONSE",
       message: {
@@ -156,16 +162,13 @@ export class ChatHandler {
 
     // Save session memory before sending response
     try {
-      if (thirdResponse?.emailSent) {
-        await this.memoryService.clearSessionMemory(chatRequest.sessionId);
-      } else {
-        await this.memoryService.updateSessionWithConversation(
-          chatRequest.sessionId,
-          collectedData.sessionHistory,
-          chatRequest.message,
-          responseText
-        );
-      }
+      await this.memoryService.updateSessionWithConversation({
+        tenantId,
+        sessionId,
+        sessionMemory: collectedData.sessionHistory,
+        userMessage,
+        assistantResponse: responseText,
+      });
     } catch (error) {
       console.error("Failed to save session memory:", error);
       // Don't fail the request if memory saving fails
@@ -175,11 +178,12 @@ export class ChatHandler {
     trace.update({
       output: response,
       metadata: {
-        taskBreakdown: {
-          guestServiceTask: firstResponse.usage,
-          buttonsTask: secondResponse.usage,
-          emailTask: thirdResponse?.usage,
-        },
+        tenantId,
+        sessionId,
+        originalLanguage: language,
+        detectedLanguage,
+        upSellButtons: buttons.filter((button) => button.isUpsell === true)
+          .length,
       },
     });
 

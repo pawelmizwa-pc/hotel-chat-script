@@ -97,11 +97,6 @@ export class ExcelSheetMatchingTask {
     // Prepare messages for LLM call
     const messages: ChatMessage[] = [
       {
-        role: "user",
-        content: input.userMessage,
-        timestamp: Date.now(),
-      },
-      {
         role: "system",
         content: formatConversationHistory(input.sessionHistory),
         timestamp: Date.now(),
@@ -116,6 +111,11 @@ export class ExcelSheetMatchingTask {
       {
         role: "system",
         content: input.excelConfig,
+        timestamp: Date.now(),
+      },
+      {
+        role: "user",
+        content: `Find most relevant sheets for the following message: ${input.userMessage}`,
         timestamp: Date.now(),
       },
     ];

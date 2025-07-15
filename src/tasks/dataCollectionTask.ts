@@ -115,9 +115,15 @@ export class DataCollectionTask {
    * @returns Promise<DataCollectionResult>
    */
   async collectData(
-    sessionId: string,
-    tenantId: string,
-    trace?: LangfuseTraceClient
+    {
+      sessionId,
+      tenantId,
+      trace,
+    }: {
+      sessionId: string;
+      tenantId: string;
+      trace?: LangfuseTraceClient;
+    }
   ): Promise<DataCollectionResult> {
     try {
       // Create span for this task
@@ -161,7 +167,7 @@ export class DataCollectionTask {
         measurePromise(this.langfuseService.getPrompt("email"), "email-prompt"),
         measurePromise(this.langfuseService.getPrompt("excel"), "excel-prompt"),
         measurePromise(
-          this.memoryService.getSessionMemory(sessionId),
+          this.memoryService.getSessionMemory(tenantId, sessionId),
           "session-history"
         ),
       ]);

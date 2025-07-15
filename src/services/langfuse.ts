@@ -4,7 +4,7 @@ import {
   LangfuseTraceClient,
   LangfuseGenerationClient,
 } from "langfuse";
-import { Env, LangfusePrompt, ChatMessage } from "../types";
+import { Env, LangfusePrompt } from "../types";
 import { extractModelNameForLangfuse } from "../utils/llmResultParser";
 
 export class LangfuseService {

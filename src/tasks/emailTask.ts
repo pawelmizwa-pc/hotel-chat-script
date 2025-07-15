@@ -1,6 +1,7 @@
 import { LangfuseService } from "../services/langfuse";
 import { LLMService } from "../services/llm";
 import { EmailService } from "../services/emailService";
+import { MemoryService } from "../services/memory";
 import { ChatMessage, LangfusePrompt, SessionMemory } from "../types";
 import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
@@ -13,7 +14,7 @@ export interface EmailTaskInput {
   excelData: string;
   emailToolPrompt: LangfusePrompt | null;
   tenantConfig: TenantConfig | null;
-  sessionHistory: SessionMemory;
+  // Remove sessionHistory from input since we'll manage our own
   sessionId: string;
   tenantId?: string;
   llmConfig: TaskLLMConfig;
@@ -39,15 +40,36 @@ export class EmailTask {
   private langfuseService: LangfuseService;
   private llmService: LLMService;
   private emailService: EmailService;
+  private memoryService: MemoryService;
 
   constructor(
     langfuseService: LangfuseService,
     llmService: LLMService,
-    emailService: EmailService
+    emailService: EmailService,
+    memoryService: MemoryService
   ) {
     this.langfuseService = langfuseService;
     this.llmService = llmService;
     this.emailService = emailService;
+    this.memoryService = memoryService;
+  }
+
+  private async getEmailSessionMemory(
+    tenantId: string,
+    sessionId: string
+  ): Promise<SessionMemory> {
+    const emailSessionMemory = await this.memoryService.getEmailSessionMemory(
+      tenantId,
+      sessionId
+    );
+    if (!emailSessionMemory) {
+      return {
+        messages: [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    return emailSessionMemory;
   }
 
   private parseEmailResponse(
@@ -106,14 +128,14 @@ export class EmailTask {
   }
 
   async execute(input: EmailTaskInput): Promise<EmailTaskOutput> {
-    // Prepare messages for OpenAI call
+    // Get email-specific session history
+    const emailSessionHistory = await this.getEmailSessionMemory(
+      input.tenantId || "default",
+      input.sessionId
+    );
+
+    // Prepare messages for OpenAI call using email session history
     const messages: ChatMessage[] = [
-      {
-        role: "user",
-        content: input.userMessage,
-        timestamp: Date.now(),
-      },
-      ...input.sessionHistory.messages,
       {
         role: "system",
         content:
@@ -128,6 +150,12 @@ export class EmailTask {
       {
         role: "system",
         content: input.excelData,
+        timestamp: Date.now(),
+      },
+      ...emailSessionHistory.messages,
+      {
+        role: "user",
+        content: input.userMessage,
         timestamp: Date.now(),
       },
     ];
@@ -221,6 +249,26 @@ export class EmailTask {
         output: result.content,
         usage: result.usage,
       });
+    }
+
+    // Update email session history with the conversation
+    try {
+      if (result.emailSent) {
+        await this.memoryService.clearEmailSessionMemory({
+          tenantId: input.tenantId || "default",
+          sessionId: input.sessionId,
+        });
+      } else {
+        await this.memoryService.updateEmailSessionWithConversation(
+          input.tenantId || "default",
+          input.sessionId,
+          input.userMessage,
+          result.responseText || result.content
+        );
+      }
+    } catch (error) {
+      console.error("Failed to save email session memory:", error);
+      // Don't fail the request if memory saving fails
     }
 
     return result;

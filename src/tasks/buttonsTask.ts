@@ -10,6 +10,7 @@ import { formatConversationHistory } from "../utils/format";
 
 export interface ButtonsTaskInput {
   userMessage: string;
+  previousMessageLanguage?: string;
   firstCallOutput?: string; // Make this optional
   excelData: string;
   buttonsPrompt: LangfusePrompt | null;
@@ -22,7 +23,12 @@ export interface ButtonsTaskInput {
 
 export interface ButtonsTaskOutput {
   content: string;
-  buttons: Array<{ type: "postback"; title: string; payload: string }>;
+  buttons: Array<{
+    type: "postback";
+    title: string;
+    payload: string;
+    isUpsell: boolean;
+  }>;
   language: string;
   usage?: {
     promptTokens: number;
@@ -45,7 +51,12 @@ export class ButtonsTask {
     content: string,
     generation?: any
   ): {
-    buttons: Array<{ type: "postback"; title: string; payload: string }>;
+    buttons: Array<{
+      type: "postback";
+      title: string;
+      payload: string;
+      isUpsell: boolean;
+    }>;
     language: string;
   } {
     interface ButtonsResponse {
@@ -88,6 +99,7 @@ export class ButtonsTask {
           type: "postback" as const,
           title: item.title,
           payload: item.payload,
+          isUpsell: item.isUpsell,
         })),
         language: buttonsData.language || "en",
       };
@@ -103,16 +115,6 @@ export class ButtonsTask {
     // Prepare messages for OpenAI call
     const messages: ChatMessage[] = [
       {
-        role: "user",
-        content: input.userMessage,
-        timestamp: Date.now(),
-      },
-      {
-        role: "system",
-        content: formatConversationHistory(input.sessionHistory),
-        timestamp: Date.now(),
-      },
-      {
         role: "system",
         content:
           input.buttonsPrompt?.prompt || "You are a helpful hotel assistant.",
@@ -126,6 +128,23 @@ export class ButtonsTask {
       {
         role: "system",
         content: input.excelData,
+        timestamp: Date.now(),
+      },
+      {
+        role: "system",
+        content: formatConversationHistory(input.sessionHistory),
+        timestamp: Date.now(),
+      },
+      {
+        role: "system",
+        content: input.previousMessageLanguage
+          ? `The previous message language is: ${input.previousMessageLanguage}`
+          : "",
+        timestamp: Date.now(),
+      },
+      {
+        role: "user",
+        content: `Create buttons for the following message: ${input.userMessage}`,
         timestamp: Date.now(),
       },
     ];

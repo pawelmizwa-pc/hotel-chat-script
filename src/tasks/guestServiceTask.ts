@@ -5,7 +5,6 @@ import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
 import { TaskLLMConfig } from "../config/llmConfig";
 import { validateMessagesForAnthropic } from "../utils/messageValidator";
-import { formatConversationHistory } from "../utils/format";
 
 export interface GuestServiceTaskInput {
   userMessage: string;
@@ -41,16 +40,6 @@ export class GuestServiceTask {
     // Prepare messages for OpenAI call
     const messages: ChatMessage[] = [
       {
-        role: "user",
-        content: input.userMessage,
-        timestamp: Date.now(),
-      },
-      {
-        role: "system",
-        content: formatConversationHistory(input.sessionHistory),
-        timestamp: Date.now(),
-      },
-      {
         role: "system",
         content:
           input.guestServicePrompt?.prompt ||
@@ -65,6 +54,12 @@ export class GuestServiceTask {
       {
         role: "system",
         content: input.excelData,
+        timestamp: Date.now(),
+      },
+      ...input.sessionHistory.messages,
+      {
+        role: "user",
+        content: input.userMessage,
         timestamp: Date.now(),
       },
     ];
