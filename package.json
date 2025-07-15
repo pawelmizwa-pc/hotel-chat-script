@@ -28,7 +28,7 @@
     "@google/generative-ai": "^0.21.0",
     "@langchain/core": "^0.2.31",
     "@langchain/openai": "^0.2.8",
-    "google-auth-library": "^10.1.0",
+    "google-auth-library": "^9.15.1",
     "google-spreadsheet": "^4.1.4",
     "googleapis": "^140.0.1",
     "json2md": "^2.0.3",
