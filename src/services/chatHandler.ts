@@ -78,10 +78,27 @@ export class ChatHandler {
       this.env.TENAT_KNOWLEDGE_CACHE
     );
     const excelDataResult = await excelDataFetchingTask.execute({
-      recommendedSheets,
+      recommendedSheets: [
+        {
+          sheet_name: "01_hotel_basic_info",
+          relevance_score: 0.9,
+        },
+        {
+          sheet_name: "02_rooms_and_accommodations",
+          relevance_score: 0.8,
+        },
+        {
+          sheet_name: "03_dining_and_restaurants",
+          relevance_score: 0.7,
+        },
+        {
+          sheet_name: "04_wellness_and_spa_facilities",
+          relevance_score: 0.6,
+        },
+      ],
       tenantId,
       sessionId,
-      spreadsheetId: collectedData.tenantConfig?.spreadsheetId,
+      spreadsheetId: "1D2e5WCakqoupQy6lXWWBa6YS0-ThSQlIgh7Z0lS-2m8",
       trace,
     });
 
