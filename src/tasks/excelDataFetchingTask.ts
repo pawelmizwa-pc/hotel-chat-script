@@ -37,8 +37,7 @@ export class ExcelDataFetchingTask {
   private googleSheets: GoogleSheets;
   private tenantKnowledgeCache: KVNamespace;
   private readonly CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-  private readonly MAX_RETRY_ATTEMPTS = 1;
-  private readonly RETRY_DELAY_BASE_MS = 1000; // 1 second base delay
+  private readonly MAX_RETRY_ATTEMPTS = 3; // Increased for API enablement issues
 
   constructor(
     langfuseService: LangfuseService,
@@ -361,10 +360,25 @@ export class ExcelDataFetchingTask {
     retryAttempt: number = 0
   ): Promise<string> {
     try {
-      return await this.googleSheets.collectSheetAsMarkdown(
+      const sheetData = await this.googleSheets.collectSheetAsMarkdown(
         spreadsheetId,
         sheetName
       );
+
+      // Check if the returned data contains a 403 Google API error
+      if (
+        sheetData.includes("Google API error - [403]") ||
+        sheetData.includes("Google Sheets API has not been used") ||
+        sheetData.includes("it is disabled")
+      ) {
+        const error = new Error(
+          `Google API 403/enablement error detected in sheet data: ${sheetName}`
+        );
+        (error as any).status = 403;
+        throw error;
+      }
+
+      return sheetData;
     } catch (error) {
       console.error(
         `Error fetching sheet "${sheetName}" from Google Sheets (attempt ${
@@ -378,12 +392,30 @@ export class ExcelDataFetchingTask {
         this.isRetryableError(error) &&
         retryAttempt < this.MAX_RETRY_ATTEMPTS
       ) {
-        const delayMs = this.RETRY_DELAY_BASE_MS * Math.pow(2, retryAttempt); // Exponential backoff
-        console.log(
-          `Retrying in ${delayMs}ms... (attempt ${retryAttempt + 1}/${
-            this.MAX_RETRY_ATTEMPTS
-          })`
-        );
+        const delayMs = 100;
+
+        // Special logging for 403 API enablement errors
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        if (
+          errorMessage.includes("403") ||
+          errorMessage.includes("enablement")
+        ) {
+          console.log(
+            `🔄 Google API 403 detected for "${sheetName}" - this might be an API enablement issue. Retrying in ${delayMs}ms... (attempt ${
+              retryAttempt + 1
+            }/${this.MAX_RETRY_ATTEMPTS})`
+          );
+          console.log(
+            `💡 If this persists, ensure Google Sheets API is enabled in Google Cloud Console`
+          );
+        } else {
+          console.log(
+            `Retrying in ${delayMs}ms... (attempt ${retryAttempt + 1}/${
+              this.MAX_RETRY_ATTEMPTS
+            })`
+          );
+        }
 
         await this.sleep(delayMs);
         return this.fetchSheetFromGoogleSheets(
@@ -496,6 +528,14 @@ export class ExcelDataFetchingTask {
                 input.spreadsheetId,
                 sheet.sheet_name
               );
+              if (sheetData.includes("Google API error")) {
+                errors.push(
+                  `Google API 403/enablement error detected in sheet data: ${sheet.sheet_name}`
+                );
+                throw new Error(
+                  `Google API 403/enablement error detected in sheet data: ${sheet.sheet_name}`
+                );
+              }
 
               // Cache the fresh data
               await this.cacheSheetData(
