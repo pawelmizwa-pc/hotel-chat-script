@@ -10,7 +10,7 @@ import { LangfuseService } from "./langfuse";
 import { LLMService } from "./llm";
 import { GoogleSheets } from "./googleSheets";
 import { EmailService } from "./emailService";
-import { CostDetails, DetailedUsage } from "../utils/usageTracker";
+import { DetailedUsage } from "../utils/usageTracker";
 
 export class ChatHandler {
   private langfuseService: LangfuseService;
@@ -201,7 +201,6 @@ export class ChatHandler {
     // End the trace with the final response and usage summary
     trace.update({
       output: response,
-      usage: aggregateUsage,
       metadata: {
         tenantId,
         sessionId,
@@ -211,6 +210,7 @@ export class ChatHandler {
           .length,
         taskCount: 4, // guestService, buttons, email, excelSheetMatching
         totalTokensUsed: aggregateUsage.total,
+        aggregateUsage,
         tasksCompleted: [
           "GuestServiceTask",
           "ButtonsTask",

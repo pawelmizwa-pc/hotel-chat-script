@@ -76,9 +76,6 @@ export class LangfuseService {
           input: usageDetails.usageDetails.input,
           output: usageDetails.usageDetails.output,
           total: usageDetails.usageDetails.total,
-          inputCost: usageDetails.costDetails.input,
-          outputCost: usageDetails.costDetails.output,
-          totalCost: usageDetails.costDetails.total,
         },
       });
     } else {
