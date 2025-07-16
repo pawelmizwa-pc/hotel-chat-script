@@ -30,49 +30,21 @@ export class ChatHandler {
   }
 
   async processChat(chatRequest: ChatRequest): Promise<ChatResponse> {
+    const { message: userMessage, ...metadata } = chatRequest;
     const tenantId = chatRequest.tenantId || "default";
     const sessionId = chatRequest.sessionId;
     const language = chatRequest.language;
-    const userMessage = chatRequest.message;
-    const utmTracking = chatRequest.utmTracking;
-    const hasUTMData = chatRequest.hasUTMData || false;
 
     // Create Langfuse trace for the entire request with UTM tracking and button interaction
-    const trace = this.langfuseService.createTrace(
+    const trace = this.langfuseService.createTrace({
       sessionId,
-      {
+      input: {
         userMessage,
         language,
         tenantId,
-        hasUTMData,
-        interaction: {
-          messageType: chatRequest.messageType,
-          buttonClicked: chatRequest.buttonClicked,
-          buttonType: chatRequest.buttonType,
-          buttonTitle: chatRequest.buttonTitle,
-          buttonPayload: chatRequest.buttonPayload,
-          isUpsell: chatRequest.isUpsell,
-        },
-        requestTimestamp: new Date().toISOString(),
       },
-      utmTracking
-    );
-
-    // Log button interaction if present
-    if (chatRequest.buttonClicked && chatRequest.isUpsell) {
-      this.langfuseService.logButtonInteraction(trace, chatRequest, true);
-
-      // Log upsell event if it's an upsell button
-      this.langfuseService.logUpsellEvent(
-        trace,
-        {
-          buttonTitle: chatRequest.buttonTitle,
-          upsellType: chatRequest.buttonType,
-          // You can add potential value logic here based on button type
-        },
-        utmTracking
-      );
-    }
+      metadata,
+    });
 
     // Initialize by collecting data from all services
     const dataCollectionTask = new DataCollectionTask(
@@ -166,7 +138,6 @@ export class ChatHandler {
         tenantId,
         llmConfig: collectedData.configs.emailTool,
         trace,
-        utmTracking,
       }),
     ]);
 
@@ -244,7 +215,6 @@ export class ChatHandler {
       metadata: {
         tenantId,
         sessionId,
-        originalLanguage: language,
         detectedLanguage,
         upSellButtons: buttons.filter((button) => button.isUpsell === true)
           .length,

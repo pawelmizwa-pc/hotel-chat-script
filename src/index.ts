@@ -1,10 +1,5 @@
-import { Env, ChatRequest, ChatResponse } from "./types";
+import { Env, ChatRequest } from "./types";
 import { ChatHandler } from "./services/chatHandler";
-import {
-  validateButtonInteraction,
-  cleanButtonInteraction,
-} from "./utils/buttonUtils";
-import { validateUTMData, cleanUTMData } from "./utils/utmUtils";
 
 export default {
   async fetch(
@@ -40,37 +35,6 @@ export default {
             headers: getCORSHeaders(),
           }
         );
-      }
-
-      // Validate and clean UTM data if present
-      if (chatRequest.utmTracking) {
-        if (!validateUTMData(chatRequest.utmTracking)) {
-          console.warn(
-            "Invalid UTM tracking data received:",
-            chatRequest.utmTracking
-          );
-          // Don't fail the request, just remove invalid UTM data
-          delete chatRequest.utmTracking;
-          chatRequest.hasUTMData = false;
-        } else {
-          chatRequest.utmTracking = cleanUTMData(chatRequest.utmTracking);
-        }
-      }
-
-      // Validate and clean button interaction data if present
-      if (chatRequest.buttonInteraction) {
-        if (!validateButtonInteraction(chatRequest.buttonInteraction)) {
-          console.warn(
-            "Invalid button interaction data received:",
-            chatRequest.buttonInteraction
-          );
-          // Don't fail the request, just remove invalid button data
-          delete chatRequest.buttonInteraction;
-        } else {
-          chatRequest.buttonInteraction = cleanButtonInteraction(
-            chatRequest.buttonInteraction
-          );
-        }
       }
 
       // Process chat using ChatHandler
