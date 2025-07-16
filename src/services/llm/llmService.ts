@@ -12,6 +12,7 @@ import { OpenAIProvider } from "./openaiProvider";
 import { GoogleProvider } from "./googleProvider";
 import { AnthropicProvider } from "./anthropicProvider";
 import { OpenRouterProvider } from "./openrouterProvider";
+import { GroqProvider } from "./groqProvider";
 
 export class LLMService {
   private providers: Map<LLMProviderType, LLMProvider> = new Map();
@@ -28,11 +29,13 @@ export class LLMService {
     const google = new GoogleProvider(this.env);
     const anthropic = new AnthropicProvider(this.env);
     const openrouter = new OpenRouterProvider(this.env);
+    const groq = new GroqProvider(this.env);
 
     this.providers.set("openai", openai);
     this.providers.set("google", google);
     this.providers.set("anthropic", anthropic);
     this.providers.set("openrouter", openrouter);
+    this.providers.set("groq", groq);
   }
 
   /**
@@ -61,6 +64,11 @@ export class LLMService {
     const openrouterProvider = this.providers.get("openrouter");
     if (openrouterProvider && tenantConfig["openrouter-api-key"]) {
       openrouterProvider.setTenantApiKey(tenantConfig["openrouter-api-key"]);
+    }
+
+    const groqProvider = this.providers.get("groq");
+    if (groqProvider && tenantConfig["groq-api-key"]) {
+      groqProvider.setTenantApiKey(tenantConfig["groq-api-key"]);
     }
   }
 

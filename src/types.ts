@@ -79,6 +79,9 @@ export interface Env {
   // Anthropic
   ANTHROPIC_API_KEY?: string;
 
+  // Groq
+  GROQ_API_KEY?: string;
+
   // Langfuse
   LANGFUSE_HOST: string;
   LANGFUSE_SECRET_KEY: string;
@@ -111,7 +114,12 @@ export interface Env {
 }
 
 // LLM Provider Types
-export type LLMProviderType = "openai" | "google" | "anthropic" | "openrouter";
+export type LLMProviderType =
+  | "openai"
+  | "google"
+  | "anthropic"
+  | "openrouter"
+  | "groq";
 
 export interface LLMCompletionOptions {
   model?: string;

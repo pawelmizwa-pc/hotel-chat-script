@@ -15,6 +15,7 @@ export interface TenantConfig {
   "openrouter-api-key"?: string;
   "google-ai-api-key"?: string;
   "anthropic-api-key"?: string;
+  "groq-api-key"?: string;
 }
 
 export interface DataCollectionResult {

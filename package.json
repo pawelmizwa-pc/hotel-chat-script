@@ -30,6 +30,7 @@
     "@langchain/openai": "^0.2.8",
     "google-spreadsheet": "^4.1.4",
     "googleapis": "^140.0.1",
+    "groq-sdk": "^0.27.0",
     "json2md": "^2.0.3",
     "langfuse": "^3.22.0",
     "openai": "^4.67.0"
