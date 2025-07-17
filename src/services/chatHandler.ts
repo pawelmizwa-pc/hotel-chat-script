@@ -106,52 +106,118 @@ export class ChatHandler {
       this.memoryService
     );
 
-    // Wait for all tasks to complete using Promise.all
-    const [firstResponse, secondResponse, thirdResponse] = await Promise.all([
-      guestServiceTask.execute({
-        userMessage,
-        sessionHistory: collectedData.sessionHistory,
-        excelData: excelDataResult.excelData,
-        guestServicePrompt: collectedData.prompts.guestService,
-        tenantConfig: collectedData.tenantConfig,
-        sessionId,
-        llmConfig: collectedData.configs.guestService,
-        trace,
-      }),
-      buttonsTask.execute({
-        userMessage,
-        excelData: excelDataResult.excelData,
-        buttonsPrompt: collectedData.prompts.buttons,
-        tenantConfig: collectedData.tenantConfig,
-        sessionId,
-        llmConfig: collectedData.configs.buttons,
-        sessionHistory: collectedData.sessionHistory,
-        previousMessageLanguage: language,
-        trace,
-      }),
-      emailTask.execute({
-        userMessage,
-        excelData: excelDataResult.excelData,
-        emailToolPrompt: collectedData.prompts.emailTool,
-        tenantConfig: collectedData.tenantConfig,
-        sessionId,
-        tenantId,
-        llmConfig: collectedData.configs.emailTool,
-        trace,
-      }),
-    ]);
+    // Execute all tasks in parallel with error handling
+    const [firstResponse, secondResponse, thirdResponse] =
+      await Promise.allSettled([
+        guestServiceTask.execute({
+          userMessage,
+          sessionHistory: collectedData.sessionHistory,
+          excelData: excelDataResult.excelData,
+          guestServicePrompt: collectedData.prompts.guestService,
+          tenantConfig: collectedData.tenantConfig,
+          sessionId,
+          llmConfig: collectedData.configs.guestService,
+          trace,
+        }),
+        buttonsTask.execute({
+          userMessage,
+          excelData: excelDataResult.excelData,
+          buttonsPrompt: collectedData.prompts.buttons,
+          tenantConfig: collectedData.tenantConfig,
+          sessionId,
+          llmConfig: collectedData.configs.buttons,
+          sessionHistory: collectedData.sessionHistory,
+          previousMessageLanguage: language,
+          trace,
+        }),
+        emailTask.execute({
+          userMessage,
+          excelData: excelDataResult.excelData,
+          emailToolPrompt: collectedData.prompts.emailTool,
+          tenantConfig: collectedData.tenantConfig,
+          sessionId,
+          tenantId,
+          llmConfig: collectedData.configs.emailTool,
+          trace,
+        }),
+      ]);
 
     // Reset to default API keys after processing (optional, for cleanup)
     this.llmService.resetToDefaultApiKeys();
 
-    // Use parsed buttons from secondResponse
-    const buttons = secondResponse.buttons;
-    const detectedLanguage = secondResponse.language;
+    // Extract guest service task result - this is critical and should fail the request if it fails
+    if (firstResponse.status === "rejected") {
+      console.error("Guest service task failed:", firstResponse.reason);
+      throw new Error(
+        `Guest service task failed: ${
+          firstResponse.reason instanceof Error
+            ? firstResponse.reason.message
+            : String(firstResponse.reason)
+        }`
+      );
+    }
+    const guestServiceResult = firstResponse.value;
 
-    // Use the parsed text from guest service response, or response text if email task was executed
-    const responseText = thirdResponse?.duringEmailClarification
-      ? thirdResponse.responseText
-      : firstResponse.content;
+    // Extract buttons task result with fallback to empty array if failed
+    let buttons: Array<{
+      type: "postback";
+      title: string;
+      payload: string;
+      isUpsell: boolean;
+    }> = [];
+    let detectedLanguage = "en";
+    let buttonsUsage = undefined;
+
+    if (secondResponse.status === "fulfilled") {
+      buttons = secondResponse.value.buttons;
+      detectedLanguage = secondResponse.value.language;
+      buttonsUsage = secondResponse.value.usage;
+    } else {
+      console.error("Buttons task failed:", secondResponse.reason);
+      // Log failure for monitoring [[memory:3315930]]
+      if (trace) {
+        trace.update({
+          metadata: {
+            buttonsTaskFailure: {
+              error:
+                secondResponse.reason instanceof Error
+                  ? secondResponse.reason.message
+                  : String(secondResponse.reason),
+              timestamp: new Date().toISOString(),
+            },
+          },
+        });
+      }
+    }
+
+    // Extract email task result with fallback to guest service response if failed
+    let responseText = guestServiceResult.content;
+    let emailUsage = undefined;
+
+    if (thirdResponse.status === "fulfilled") {
+      // Use email response text if during email clarification, otherwise use guest service response
+      responseText = thirdResponse.value.duringEmailClarification
+        ? thirdResponse.value.responseText
+        : guestServiceResult.content;
+      emailUsage = thirdResponse.value.usage;
+    } else {
+      console.error("Email task failed:", thirdResponse.reason);
+      if (trace) {
+        trace.update({
+          metadata: {
+            emailTaskFailure: {
+              error:
+                thirdResponse.reason instanceof Error
+                  ? thirdResponse.reason.message
+                  : String(thirdResponse.reason),
+              timestamp: new Date().toISOString(),
+            },
+          },
+        });
+      }
+      // Use guest service response as fallback
+      responseText = guestServiceResult.content;
+    }
 
     // Create the response structure
     const response: ChatResponse = {
@@ -188,9 +254,9 @@ export class ChatHandler {
 
     // Calculate aggregate usage and costs
     const allTaskUsages = [
-      firstResponse.usage,
-      secondResponse.usage,
-      thirdResponse.usage,
+      guestServiceResult.usage,
+      buttonsUsage,
+      emailUsage,
       excelSheetMatchingResult.usage,
     ].filter(Boolean);
 
