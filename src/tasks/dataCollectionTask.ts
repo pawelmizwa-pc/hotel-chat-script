@@ -16,6 +16,8 @@ export interface TenantConfig {
   "google-ai-api-key"?: string;
   "anthropic-api-key"?: string;
   "groq-api-key"?: string;
+  // Email configuration
+  emailTo?: string[];
 }
 
 export interface DataCollectionResult {
@@ -120,17 +122,15 @@ export class DataCollectionTask {
    * @param trace Optional Langfuse trace object
    * @returns Promise<DataCollectionResult>
    */
-  async collectData(
-    {
-      sessionId,
-      tenantId,
-      trace,
-    }: {
-      sessionId: string;
-      tenantId: string;
-      trace?: LangfuseTraceClient;
-    }
-  ): Promise<DataCollectionResult> {
+  async collectData({
+    sessionId,
+    tenantId,
+    trace,
+  }: {
+    sessionId: string;
+    tenantId: string;
+    trace?: LangfuseTraceClient;
+  }): Promise<DataCollectionResult> {
     try {
       // Create span for this task
       const span = trace

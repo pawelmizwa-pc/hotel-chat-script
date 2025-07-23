@@ -1,7 +1,7 @@
 import { Env } from "../types";
 
 export interface EmailOptions {
-  to: string;
+  to: string[];
   subject: string;
   text?: string;
   html?: string;
@@ -15,14 +15,6 @@ export class EmailService {
   }
 
   async sendEmail(options: EmailOptions): Promise<string> {
-    if (this.env.RESEND_API_KEY) {
-      return this.sendWithResend(options);
-    } else {
-      return this.sendWithWebhook(options);
-    }
-  }
-
-  private async sendWithResend(options: EmailOptions): Promise<string> {
     try {
       const response = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -34,7 +26,7 @@ export class EmailService {
           from:
             this.env.RESEND_FROM_EMAIL ||
             `"Hotel Guest Service" <noreply@yourhotel.com>`,
-          to: [options.to],
+          to: options.to,
           subject: options.subject,
           text: options.text,
           html: options.html,
@@ -51,33 +43,6 @@ export class EmailService {
       }
     } catch (error) {
       console.error("Error sending email via Resend:", error);
-      throw error;
-    }
-  }
-
-  private async sendWithWebhook(options: EmailOptions): Promise<string> {
-    try {
-      // For development/testing - log the email details
-      const emailData = {
-        from: `"${this.env.GMAIL_FROM_NAME || "Hotel Guest Service"}" <${
-          this.env.GMAIL_USER
-        }>`,
-        to: options.to,
-        subject: options.subject,
-        text: options.text || "",
-        html: options.html || "",
-        timestamp: new Date().toISOString(),
-        service: "gmail-webhook-pending",
-      };
-
-      console.log("Email data (implement webhook/service):", emailData);
-
-      // You can integrate with any HTTP-based email service here
-      // For example: Mailgun, SendGrid, Postmark, etc.
-
-      return `Email logged for webhook processing - ${emailData.timestamp}`;
-    } catch (error) {
-      console.error("Error with webhook email:", error);
       throw error;
     }
   }

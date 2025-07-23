@@ -7,5 +7,6 @@
   "openai-api-key": "sk-optional-tenant-specific-openai-key-here",
   "openrouter-api-key": "sk-optional-tenant-specific-openrouter-key-here",
   "google-ai-api-key": "optional-tenant-specific-google-ai-key-here",
-  "anthropic-api-key": "sk-ant-optional-tenant-specific-anthropic-key-here"
+  "anthropic-api-key": "sk-ant-optional-tenant-specific-anthropic-key-here",
+  "emailTo": ["ai.agent.logs@pragmaticcoders.com", "pawel.mizwa@pragmaticcoders.com"]
 }

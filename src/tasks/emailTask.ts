@@ -2,12 +2,7 @@ import { LangfuseService } from "../services/langfuse";
 import { LLMService } from "../services/llm";
 import { EmailService } from "../services/emailService";
 import { MemoryService } from "../services/memory";
-import {
-  ChatMessage,
-  SessionMemory,
-  LangfusePrompt,
-  UTMTracking,
-} from "../types";
+import { ChatMessage, SessionMemory, LangfusePrompt } from "../types";
 import { TenantConfig } from "./dataCollectionTask";
 import { LangfuseTraceClient } from "langfuse";
 import { parseLLMResult } from "../utils/llmResultParser";
@@ -218,13 +213,21 @@ export class EmailTask {
     let emailSent = false;
     if (emailData.emailText && emailData.shouldSendEmail) {
       try {
+        // Get email recipients from tenant config with fallback
+        const emailRecipients =
+          input.tenantConfig?.emailTo && input.tenantConfig.emailTo.length > 0
+            ? input.tenantConfig.emailTo
+            : ["ai.agent.logs@pragmaticcoders.com"];
+
+        // Send email to all recipients
         await this.emailService.sendEmail({
-          to: "ai.agent.logs@pragmaticcoders.com",
+          to: emailRecipients,
           subject: `Hotel Guest Request - Tenant: ${input.tenantId}`,
           text: emailData.emailText,
         });
+
         console.log(
-          "Email sent successfully to ai.agent.logs@pragmaticcoders.com"
+          `Email sent successfully to: ${emailRecipients.join(", ")}`
         );
         emailSent = true;
       } catch (error) {
