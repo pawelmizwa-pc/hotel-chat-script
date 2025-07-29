@@ -1,4 +1,4 @@
-name = "hotel-agent-backend-test"
+name = "hotel-agent-backend-prod"
 main = "src/index.ts"
 compatibility_date = "2024-10-25"
 compatibility_flags = ["nodejs_compat"]
@@ -6,20 +6,20 @@ compatibility_flags = ["nodejs_compat"]
 # KV namespace for session storage
 [[kv_namespaces]]
 binding = "CHAT_SESSIONS"
-id = "90e1d327acd344a39fd5c575e4d6d949"
-preview_id = "90e1d327acd344a39fd5c575e4d6d949"
+id = "b4ca85b093f14eea88c63a7caf74b1cf"
+preview_id = "b4ca85b093f14eea88c63a7caf74b1cf"
 
 # KV namespace for tenant configuration
 [[kv_namespaces]]
 binding = "TENAT_CONFIG"
-id = "89798cccec8a4dc097e28c936da0846c"
-preview_id = "89798cccec8a4dc097e28c936da0846c"
+id = "5179afaef1e64b32abd7b5f787026bc6"
+preview_id = "5179afaef1e64b32abd7b5f787026bc6"
 
 # KV namespace for tenant knowledge cache
 [[kv_namespaces]]
 binding = "TENAT_KNOWLEDGE_CACHE"
-id = "c20c6cd23a88476cb4ea38e2257c78a7"
-preview_id = "c20c6cd23a88476cb4ea38e2257c78a7"
+id = "074bf137a56d4b8d8169770f97e0f719"
+preview_id = "074bf137a56d4b8d8169770f97e0f719"
 
 [observability]
 enabled = true
@@ -28,7 +28,7 @@ head_sampling_rate = 1 # optional. default = 1.
 [vars]
 # Langfuse
 LANGFUSE_HOST = "https://cloud.langfuse.com"
-LANGFUSE_PUBLIC_KEY = "pk-lf-affdb403-f018-49f5-86ba-26fb4217d46f"
+LANGFUSE_PUBLIC_KEY = "pk-lf-50743c4b-394e-4448-95a7-3409f8a77239"
 
 # Google Sheets
 GOOGLE_SHEETS_DOCUMENT_ID = "1lx-s6rxPGn4IKgFQk7vrtO4nDH0diHE1dr04u8b6dx4"
