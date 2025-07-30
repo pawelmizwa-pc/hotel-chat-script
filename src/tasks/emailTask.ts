@@ -187,21 +187,42 @@ export class EmailTask {
         maxTokens: llmConfig.maxTokens,
       });
     } catch (error) {
-      // Log LLM failure to Langfuse generation
-      if (generation) {
-        generation.update({
-          metadata: {
-            llmError: {
-              message: error instanceof Error ? error.message : String(error),
-              task: "EmailTask",
-              model: llmConfig.model,
-              provider: llmConfig.provider,
-              timestamp: new Date().toISOString(),
+      // Try alternative model
+      try {
+        const alternativeResponse = await this.llmService.createCompletion(
+          validatedMessages,
+          {
+            model: llmConfig.alternative.model,
+            provider: llmConfig.alternative.provider,
+            temperature: llmConfig.alternative.temperature,
+            maxTokens: llmConfig.alternative.maxTokens,
+          }
+        );
+        response = alternativeResponse;
+      } catch (alternativeError) {
+        await this.memoryService.updateEmailSessionWithConversation(
+          input.tenantId || "default",
+          input.sessionId,
+          input.userMessage,
+          ""
+        );
+        console.error("Failed to use alternative model:", alternativeError);
+        // Log LLM failure to Langfuse generation
+        if (generation) {
+          generation.update({
+            metadata: {
+              llmError: {
+                message: error instanceof Error ? error.message : String(error),
+                task: "EmailTask",
+                model: llmConfig.model,
+                provider: llmConfig.provider,
+                timestamp: new Date().toISOString(),
+              },
             },
-          },
-        });
+          });
+        }
+        throw error;
       }
-      throw error;
     }
 
     const content = response.content;
@@ -274,19 +295,12 @@ export class EmailTask {
 
     // Update email session history with the conversation
     try {
-      if (result.emailSent) {
-        await this.memoryService.clearEmailSessionMemory({
-          tenantId: input.tenantId || "default",
-          sessionId: input.sessionId,
-        });
-      } else {
-        await this.memoryService.updateEmailSessionWithConversation(
-          input.tenantId || "default",
-          input.sessionId,
-          input.userMessage,
-          result.responseText || result.content
-        );
-      }
+      await this.memoryService.updateEmailSessionWithConversation(
+        input.tenantId || "default",
+        input.sessionId,
+        input.userMessage,
+        result.responseText || result.content
+      );
     } catch (error) {
       console.error("Failed to save email session memory:", error);
       // Don't fail the request if memory saving fails

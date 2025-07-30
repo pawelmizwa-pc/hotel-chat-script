@@ -108,6 +108,7 @@ export class DataCollectionTask {
         provider: parsedConfig.provider,
         temperature: parsedConfig.temperature ?? defaultConfig.temperature,
         maxTokens: parsedConfig.maxTokens ?? defaultConfig.maxTokens,
+        alternative: parsedConfig.alternative ?? defaultConfig.alternative,
       };
     } catch (error) {
       console.warn(`Error processing config for ${taskName}:`, error);

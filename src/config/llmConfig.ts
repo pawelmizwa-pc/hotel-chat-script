@@ -4,7 +4,13 @@ export interface TaskLLMConfig {
   model: string;
   provider: LLMProviderType;
   temperature: number;
-  maxTokens: number;
+  maxTokens?: number;
+  alternative: {
+    model: string;
+    provider: LLMProviderType;
+    temperature: number;
+    maxTokens?: number;
+  };
 }
 
 export interface LLMTaskConfigs {
@@ -18,26 +24,42 @@ export const LLM_TASK_CONFIGS: LLMTaskConfigs = {
   buttonsTask: {
     model: "tngtech/deepseek-r1t2-chimera:free",
     provider: "openrouter",
-    temperature: 0,
-    maxTokens: 1000,
+    temperature: 0.7,
+    alternative: {
+      model: "gemini-2.5-flash-lite-preview-06-17",
+      provider: "google",
+      temperature: 0.7,
+    },
   },
   emailTask: {
     model: "gpt-4o",
     provider: "openai",
-    temperature: 0.5,
-    maxTokens: 1000,
+    temperature: 0.7,
+    alternative: {
+      model: "gemini-2.5-flash",
+      provider: "google",
+      temperature: 0.7,
+    },
   },
   guestServiceTask: {
     model: "gpt-4.1-mini",
     provider: "openai",
-    temperature: 0.5,
-    maxTokens: 1000,
+    temperature: 0.7,
+    alternative: {
+      model: "gemini-2.5-flash-lite-preview-06-17",
+      provider: "google",
+      temperature: 0.7,
+    },
   },
   excelSheetMatchingTask: {
     model: "tngtech/deepseek-r1t2-chimera:free",
     provider: "openrouter",
-    temperature: 0,
-    maxTokens: 1000,
+    temperature: 0.7,
+    alternative: {
+      model: "gemini-2.5-flash-lite-preview-06-17",
+      provider: "google",
+      temperature: 0.7,
+    },
   },
 };
 
