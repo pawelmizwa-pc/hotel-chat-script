@@ -106,7 +106,7 @@ The system processes requests through a coordinated task pipeline:
 5. **Buttons Generation** - Creates dynamic UI buttons for enhanced UX
 6. **Email Processing** - Handles service reservations and staff notifications
 
-Each task is independently configurable through Langfuse prompts and LLM configurations.
+Each task is independently configurable through Langfuse prompts and LLM configurations. **Guest Service** and **Email Processing** tasks include built-in resilience through automatic alternative model fallback when primary LLM providers fail.
 
 ## Examples Folder
 
@@ -183,8 +183,17 @@ Multi-level strategy ensures graceful degradation:
 
 - **Request Level**: CORS, validation, global error catching
 - **Service Level**: Provider fallbacks, KV operation recovery, auth error handling
-- **Task Level**: LLM response parsing, data validation, cache recovery
+- **Task Level**: LLM response parsing, data validation, cache recovery, automatic alternative model fallback (Guest Service & Email Processing)
 - **User Facing**: Polish language messages with technical logging
+
+### Alternative Model Fallback
+
+**Guest Service** and **Email Processing** tasks implement automatic LLM failure recovery through alternative model configuration:
+
+- **Primary Model Failure**: When the configured LLM model fails, tasks automatically attempt the alternative model
+- **Dual Provider Support**: Alternative models can use different providers for maximum resilience
+- **Error Logging**: All LLM failures are logged to Langfuse with detailed error metadata including model, provider, and timestamp
+- **Graceful Degradation**: Only after both primary and alternative models fail does the task throw an error
 
 ## LLM Providers
 
@@ -193,6 +202,16 @@ Provider selection is configured in `src/config/llmConfig.ts` which defines:
 - Model and provider per task type
 - Temperature and token limits
 - Default configurations with override support
+- Alternative model configurations for automatic fallback (Guest Service & Email Processing)
+
+### Configuration Structure
+
+**Guest Service** and **Email Processing** tasks include both primary and alternative LLM configurations:
+
+- **Primary Configuration**: Default model, provider, temperature, and token limits
+- **Alternative Configuration**: Fallback model with potentially different provider for resilience
+- **Automatic Switching**: Tasks seamlessly switch to alternative configuration when primary fails
+- **Provider Diversity**: Alternative configurations often use different providers to avoid cascading failures
 
 The system automatically falls back between providers based on availability and supports tenant-specific API key overrides.
 
