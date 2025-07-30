@@ -50,7 +50,6 @@ export class GoogleProvider extends BaseLLMProvider {
     const {
       model = defaultOptions.model,
       temperature = defaultOptions.temperature,
-      maxTokens = defaultOptions.maxTokens,
     } = options;
 
     try {
@@ -66,7 +65,6 @@ export class GoogleProvider extends BaseLLMProvider {
         history,
         generationConfig: {
           temperature,
-          maxOutputTokens: maxTokens,
         },
       });
 

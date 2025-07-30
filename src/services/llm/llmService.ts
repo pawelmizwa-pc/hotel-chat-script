@@ -124,8 +124,7 @@ export class LLMService {
   }> {
     const {
       model = "gpt-4o-mini",
-      temperature = 0,
-      maxTokens = 1000,
+      temperature = 0.7,
       provider = "openai",
     } = options;
 
@@ -133,7 +132,7 @@ export class LLMService {
       provider,
       model,
       temperature,
-      maxTokens,
+      maxTokens: options.maxTokens,
     };
 
     const providerInstance = this.getProvider(config.provider);

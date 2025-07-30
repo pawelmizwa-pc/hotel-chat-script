@@ -43,7 +43,7 @@ export class OpenAIProvider extends BaseLLMProvider {
     const {
       model = defaultOptions.model,
       temperature = defaultOptions.temperature,
-      maxTokens = defaultOptions.maxTokens,
+      maxTokens = options.maxTokens,
     } = options;
 
     const openaiMessages = this.normalizeMessages(messages);

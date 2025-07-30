@@ -52,7 +52,7 @@ export class AnthropicProvider extends BaseLLMProvider {
     const {
       model = defaultOptions.model,
       temperature = defaultOptions.temperature,
-      maxTokens = defaultOptions.maxTokens,
+      maxTokens = options.maxTokens || 5000,
     } = options;
 
     try {

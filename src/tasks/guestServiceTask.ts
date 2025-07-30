@@ -93,21 +93,36 @@ export class GuestServiceTask {
         maxTokens: llmConfig.maxTokens,
       });
     } catch (error) {
-      // Log LLM failure to Langfuse generation
-      if (generation) {
-        generation.update({
-          metadata: {
-            llmError: {
-              message: error instanceof Error ? error.message : String(error),
-              task: "GuestServiceTask",
-              model: llmConfig.model,
-              provider: llmConfig.provider,
-              timestamp: new Date().toISOString(),
+      // Try alternative model
+      try {
+        const alternativeResponse = await this.llmService.createCompletion(
+          validatedMessages,
+          {
+            model: llmConfig.alternative.model,
+            provider: llmConfig.alternative.provider,
+            temperature: llmConfig.alternative.temperature,
+            maxTokens: llmConfig.alternative.maxTokens,
+          }
+        );
+        response = alternativeResponse;
+      } catch (alternativeError) {
+        console.error("Failed to use alternative model:", alternativeError);
+        // Log LLM failure to Langfuse generation
+        if (generation) {
+          generation.update({
+            metadata: {
+              llmError: {
+                message: error instanceof Error ? error.message : String(error),
+                task: "GuestServiceTask",
+                model: llmConfig.model,
+                provider: llmConfig.provider,
+                timestamp: new Date().toISOString(),
+              },
             },
-          },
-        });
+          });
+        }
+        throw error;
       }
-      throw error;
     }
 
     const content = response.content;

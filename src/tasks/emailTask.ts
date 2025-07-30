@@ -153,6 +153,11 @@ export class EmailTask {
         content: input.excelData,
         timestamp: Date.now(),
       },
+      {
+        role: "system",
+        content: "Today is: " + new Date().toISOString(),
+        timestamp: Date.now(),
+      },
       ...emailSessionHistory.messages,
       {
         role: "user",
