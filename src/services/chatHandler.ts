@@ -196,9 +196,11 @@ export class ChatHandler {
 
     if (thirdResponse.status === "fulfilled") {
       // Use email response text if during email clarification, otherwise use guest service response
-      responseText = thirdResponse.value.duringEmailClarification
-        ? thirdResponse.value.responseText
-        : guestServiceResult.content;
+      responseText =
+        (thirdResponse.value.duringEmailClarification ||
+          thirdResponse.value.shouldSendEmail)
+          ? thirdResponse.value.responseText
+          : guestServiceResult.content;
       emailUsage = thirdResponse.value.usage;
     } else {
       console.error("Email task failed:", thirdResponse.reason);
