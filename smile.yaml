@@ -1,0 +1,1368 @@
+description: "Hotel Smile Agent Test Suite - Aligned with JSON Database - Extended SPA Reservation Tests"
+
+# yaml-language-server: $schema=https://promptfoo.dev/config-schema.json
+
+# TO LAUNCH TEST RUN:
+# 1. npm i promptfoo
+# 2. npx promptfoo eval -c smile.yaml
+
+# TO DISPLAY EVALUATION SCORES:
+# npx promptfoo view
+# y (confirm open in browser)
+
+# Custom variables for this eval run
+defaultTest:
+  vars:
+    # Use environment variable for unique run ID
+    runId: "${EVAL_RUN_ID:-1704067200000}"
+
+prompts:
+  - "{{userInput}}"
+
+providers:
+  - id: http
+    config:
+      url: 'https://hotel-agent-backend-test.contact-56d.workers.dev'
+      method: POST
+      headers:
+        Content-Type: application/json
+      body:
+        message: '{{user_message}}'
+        sessionId: 'promptfoo_smile_{{user_id}}_{{runId}}'
+        languageName: 'Polish'
+        messageType: 'chat'
+        timestamp: '{{runId}}'
+        tenantId: 'smile'
+        utmTracking: 'promptfoo'
+        uasUTMData: false
+
+tests:
+
+## 0. Debug and Response Structure Tests
+
+- description: "Debug: Check API response structure"
+  vars:
+    user_message: "Cześć"
+    user_id: "debug_test"
+  assert:
+    - type: javascript
+      value: |
+        // Debug: Log the response structure
+        console.log('Full response:', JSON.stringify(output, null, 2));
+        console.log('Output type:', typeof output);
+        
+        if (typeof output === 'object' && output !== null) {
+          console.log('Output keys:', Object.keys(output));
+        }
+        
+        // Always pass this debug test
+        return {
+          pass: true,
+          score: 1.0,
+          reason: `DEBUG - Response structure logged. Type: ${typeof output}`
+        };
+
+## 1. Basic Hotel Information Tests
+
+### WiFi Information Test
+
+- description: "WiFi inquiry returns correct credentials"
+  vars:
+    user_message: "Jakie jest hasło do WiFi?"
+    user_id: "test_wifi_info"
+  assert:
+    - type: javascript
+      value: |
+        // Extract text from various possible response formats
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on hotel_smile_json.json General_Info sheet
+        // WiFi Network: SmileGuest or HotelSmile
+        // Password: Szczawnica2024 or Szczawnica
+        const wifiCredentials = ['smileguest', 'hotelsmile', 'szczawnica2024', 'szczawnica'];
+        const foundCredentials = wifiCredentials.filter(term => lowerText.includes(term));
+        
+        const hasWifiInfo = foundCredentials.length >= 2; // Should have network name and password
+        
+        return {
+          pass: hasWifiInfo,
+          score: foundCredentials.length / 4,
+          reason: `WiFi credentials check: Found ${foundCredentials.length}/4 terms: [${foundCredentials.join(', ')}]`
+        };
+
+### Contact Information Test
+
+- description: "Contact inquiry returns hotel phone numbers"
+  vars:
+    user_message: "Jak mogę skontaktować się z recepcją?"
+    user_id: "test_contact_info"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        // Remove spaces from response text for phone number matching
+        const normalizedText = lowerText.replace(/\s/g, '');
+        
+        // Based on hotel_smile_json.json General_Info
+        // Phone numbers: 606 655 662, 18 262 10 06, 606 665 662
+        // Also check for internal extension: 100
+        const contactNumbers = ['606 655 662', '606655662', '18 262 10 06', '18 262 1006', '606 665 662', '606665662', '100'];
+        
+        // Normalize search terms and check against normalized text
+        const foundNumbers = contactNumbers.filter(num => {
+          const normalizedNum = num.replace(/\s/g, '');
+          return normalizedText.includes(normalizedNum);
+        });
+        
+        const hasContactInfo = foundNumbers.length >= 1;
+        
+        return {
+          pass: hasContactInfo,
+          score: foundNumbers.length > 0 ? 1.0 : 0,
+          reason: `Contact info check: Found ${foundNumbers.length} phone numbers: [${foundNumbers.join(', ')}]`
+        };
+
+## 2. Dining Information Tests
+
+### Breakfast Hours Test
+
+- description: "Breakfast inquiry returns correct hours"
+  vars:
+    user_message: "Jakie są godziny śniadań?"
+    user_id: "test_breakfast_hours"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on hotel_smile_json.json Dining_Options
+        // Breakfast hours: 08:00-10:00
+        const timePatterns = ['08:00', '8:00', '10:00', '08:00-10:00', '8:00-10:00'];
+        const foundTimes = timePatterns.filter(time => lowerText.includes(time));
+        
+        const breakfastTerms = ['śniadani', 'śniadań', 'breakfast'];
+        const hasBreakfastMention = breakfastTerms.some(term => lowerText.includes(term));
+        
+        const hasCorrectInfo = foundTimes.length > 0 && hasBreakfastMention;
+        
+        return {
+          pass: hasCorrectInfo,
+          score: (foundTimes.length > 0 ? 0.5 : 0) + (hasBreakfastMention ? 0.5 : 0),
+          reason: `Breakfast hours check: Found times: [${foundTimes.join(', ')}], Has breakfast mention: ${hasBreakfastMention}`
+        };
+
+### Restaurant Hours Test
+
+- description: "Restaurant inquiry returns operating hours"
+  vars:
+    user_message: "Jakie są godziny otwarcia restauracji?"
+    user_id: "test_restaurant_hours"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on Dining_Options: Restaurant 12:00-20:00, Bar 11:00-21:00
+        const restaurantTimes = ['12:00', '20:00', '12:00-20:00'];
+        const barTimes = ['11:00', '21:00', '11:00-21:00'];
+        const foundRestaurantTimes = restaurantTimes.filter(time => lowerText.includes(time));
+        const foundBarTimes = barTimes.filter(time => lowerText.includes(time));
+        
+        const venueTerms = ['restauracj', 'bar'];
+        const hasVenueMention = venueTerms.some(term => lowerText.includes(term));
+        
+        const hasTimeInfo = foundRestaurantTimes.length > 0 || foundBarTimes.length > 0;
+        
+        return {
+          pass: hasTimeInfo && hasVenueMention,
+          score: (hasTimeInfo ? 0.7 : 0) + (hasVenueMention ? 0.3 : 0),
+          reason: `Restaurant hours: Found restaurant times: [${foundRestaurantTimes.join(', ')}], bar times: [${foundBarTimes.join(', ')}]`
+        };
+
+## 3. SPA and Wellness Tests
+
+### SPA Services Overview
+
+- description: "SPA inquiry returns comprehensive service list"
+  vars:
+    user_message: "Interesuje mnie oferta spa"
+    user_id: "test_spa_overview"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on spa sheet in hotel_smile_json.json
+        const spaCategories = ['masaże', 'zabiegi na ciało', 'zabiegi na twarz', 'rytuały', 'pakiety spa'];
+        const foundCategories = spaCategories.filter(cat => lowerText.includes(cat));
+        
+        // Specific massage types from database
+        const massageTypes = ['relaksacyjny', 'klasyczny', 'gorącymi kamieniami', 'czekoladowy', 'miodowy', 'kobido', 'lomi lomi'];
+        const foundMassages = massageTypes.filter(type => lowerText.includes(type));
+        
+        // Check for brands mentioned in Wellness sheet
+        const cosmeticBrands = ['apis', 'berkovicz', 'tatra cosmetics'];
+        const foundBrands = cosmeticBrands.filter(brand => lowerText.includes(brand));
+        
+        const hasComprehensiveInfo = foundCategories.length >= 3 && foundMassages.length >= 3;
+        
+        return {
+          pass: hasComprehensiveInfo,
+          score: (foundCategories.length / 5 * 0.4) + (foundMassages.length / 7 * 0.4) + (foundBrands.length / 3 * 0.2),
+          reason: `SPA overview: Categories: ${foundCategories.length}/5 [${foundCategories.join(', ')}], Massages: ${foundMassages.length}/7 [${foundMassages.join(', ')}], Brands: ${foundBrands.length}/3`
+        };
+
+### SPA Package Details
+
+- description: "SPA package inquiry returns specific packages with prices"
+  vars:
+    user_message: "Jakie pakiety SPA oferujecie?"
+    user_id: "test_spa_packages"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on spa sheet - specific packages
+        const packages = ['day spa', 'weekendowa regeneracja', 'tutti-frutti', 'pełen reset'];
+        const foundPackages = packages.filter(pkg => lowerText.includes(pkg));
+        
+        // Check for prices (from spa sheet)
+        const prices = ['669', '479', '449', '219', '169'];
+        const foundPrices = prices.filter(price => lowerText.includes(price));
+        
+        // Check for duration mentions
+        const durationTerms = ['3 godz', '1 godz 45 min', '1 h 40 min', '50 min'];
+        const foundDurations = durationTerms.filter(dur => lowerText.includes(dur.toLowerCase()));
+        
+        const hasPackageDetails = foundPackages.length >= 2 && foundPrices.length >= 2;
+        
+        return {
+          pass: hasPackageDetails,
+          score: (foundPackages.length / 4 * 0.4) + (foundPrices.length / 5 * 0.4) + (foundDurations.length / 4 * 0.2),
+          reason: `Package details: Packages: ${foundPackages.length}/4 [${foundPackages.join(', ')}], Prices: ${foundPrices.length}/5, Durations: ${foundDurations.length}/4`
+        };
+
+### Wellness Facilities Hours
+
+- description: "Pool and sauna hours inquiry"
+  vars:
+    user_message: "Jakie są godziny otwarcia basenu i sauny?"
+    user_id: "test_wellness_hours"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on Wellness sheet
+        // Pool, Jacuzzi, Salt cave: 16:00-21:00
+        // Saunas: 17:00-21:00
+        const poolTimes = ['16:00', '21:00', '16:00-21:00'];
+        const saunaTimes = ['17:00', '21:00', '17:00-21:00'];
+        const foundPoolTimes = poolTimes.filter(time => lowerText.includes(time));
+        const foundSaunaTimes = saunaTimes.filter(time => lowerText.includes(time));
+        
+        const facilityTerms = ['basen', 'saun', 'jacuzzi', 'grota solna'];
+        const foundFacilities = facilityTerms.filter(term => lowerText.includes(term));
+        
+        // Check for access information (Level -1, elevator)
+        const accessTerms = ['poziom -1', 'winda', 'pokoju 003'];
+        const hasAccessInfo = accessTerms.some(term => lowerText.includes(term));
+        
+        const hasTimeInfo = foundPoolTimes.length > 0 || foundSaunaTimes.length > 0;
+        
+        return {
+          pass: hasTimeInfo && foundFacilities.length >= 2,
+          score: (hasTimeInfo ? 0.5 : 0) + (foundFacilities.length / 4 * 0.3) + (hasAccessInfo ? 0.2 : 0),
+          reason: `Wellness hours: Pool times: [${foundPoolTimes.join(', ')}], Sauna times: [${foundSaunaTimes.join(', ')}], Facilities: ${foundFacilities.length}/4`
+        };
+
+## 3.1 Extended SPA Reservation Process Tests
+
+### SPA Reservation Complete Flow Test
+
+- description: "Complete SPA reservation flow - All 4 steps in sequence"
+  vars:
+    user_id: "spa_flow_session"
+  assert:
+    - type: javascript
+      value: |
+        return (async () => {
+          // This test will make 4 sequential API calls to simulate a complete conversation
+          const baseUrl = 'https://hotel-agent-backend-test.contact-56d.workers.dev';
+          const sessionId = `promptfoo_smile_spa_flow_session_${Date.now()}`;
+          
+          // Track results for each step
+          const stepResults = {
+            step1: { pass: false, score: 0, reason: '', response: '' },
+            step2: { pass: false, score: 0, reason: '', response: '' },
+            step3: { pass: false, score: 0, reason: '', response: '' },
+            step4: { pass: false, score: 0, reason: '', response: '' }
+          };
+          
+          const makeRequest = async (message, stepName) => {
+            const requestBody = {
+              message: message,
+              sessionId: sessionId,
+              languageName: 'Polish',
+              messageType: 'chat',
+              timestamp: Date.now().toString(),
+              tenantId: 'smile',
+              utmTracking: 'promptfoo',
+              uasUTMData: false
+            };
+            
+            console.log(`${stepName} - Request:`, JSON.stringify(requestBody, null, 2));
+            
+            try {
+              const response = await fetch(baseUrl, {
+                method: 'POST',
+                headers: { 
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+              });
+              
+              console.log(`${stepName} - Response status:`, response.status, response.statusText);
+              
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.log(`${stepName} - Error response:`, errorText);
+                throw new Error(`HTTP ${response.status}: ${response.statusText}. Body: ${errorText}`);
+              }
+              
+              const data = await response.json();
+              console.log(`${stepName} - Response:`, JSON.stringify(data, null, 2));
+              
+              let responseText = '';
+              if (typeof data === 'string') {
+                responseText = data;
+              } else if (data.output) {
+                responseText = data.output;
+              } else if (data.message?.attachment?.payload?.text) {
+                responseText = data.message.attachment.payload.text;
+              } else if (data.response) {
+                responseText = data.response;
+              } else if (data.text) {
+                responseText = data.text;
+              } else if (data.message) {
+                responseText = typeof data.message === 'string' ? data.message : JSON.stringify(data.message);
+              } else {
+                responseText = JSON.stringify(data);
+              }
+              
+              console.log(`${stepName} - Extracted Text:`, responseText);
+              return responseText;
+              
+            } catch (fetchError) {
+              console.error(`${stepName} - Fetch error:`, fetchError);
+              return `ERROR: ${fetchError.message}`;
+            }
+          };
+          
+          try {
+            console.log(`Starting SPA flow test with session ID: ${sessionId}`);
+            
+            // Step 1: Initial SPA reservation request
+            console.log('\n=== STEP 1: Initial Request ===');
+            const step1Response = await makeRequest(
+              "Chciałabym zarezerwować masaż relaksacyjny na jutro na 16:00",
+              "Step 1 - Initial request"
+            );
+            stepResults.step1.response = step1Response;
+            
+            // Validate Step 1
+            if (!step1Response.startsWith('ERROR:')) {
+              const step1Lower = step1Response.toLowerCase();
+              const acknowledgmentTerms = ['masaż relaksacyjny', 'jutro', '16:00', 'rezerwacja', 'zarezerwować'];
+              const foundAcknowledgment = acknowledgmentTerms.filter(term => step1Lower.includes(term));
+              const infoGatheringTerms = ['numer pokoju', 'imię', 'nazwisko', 'kontakt', 'telefon', 'email', 'dane'];
+              const hasInfoGathering = infoGatheringTerms.some(term => step1Lower.includes(term));
+              
+              console.log(`Step 1 validation: Acknowledgment terms found: ${foundAcknowledgment.length}/5, Info gathering: ${hasInfoGathering}`);
+              
+              if (foundAcknowledgment.length >= 2 && hasInfoGathering) {
+                stepResults.step1.pass = true;
+                stepResults.step1.score = (foundAcknowledgment.length / 5 * 0.3) + (hasInfoGathering ? 0.4 : 0) + 0.3;
+                stepResults.step1.reason = `SUCCESS: Acknowledgment: ${foundAcknowledgment.length}/5 [${foundAcknowledgment.join(', ')}], Info gathering: ${hasInfoGathering}`;
+              } else {
+                stepResults.step1.reason = `FAILED: Acknowledgment: ${foundAcknowledgment.length}/5 [${foundAcknowledgment.join(', ')}], Info gathering: ${hasInfoGathering}`;
+              }
+            } else {
+              stepResults.step1.reason = `ERROR: ${step1Response}`;
+            }
+            
+            // Wait between steps
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Step 2: Provide partial user data
+            console.log('\n=== STEP 2: Partial Data ===');
+            const step2Response = await makeRequest(
+              "Nazywam się Anna Testowa, jestem w pokoju 205",
+              "Step 2 - Partial data"
+            );
+            stepResults.step2.response = step2Response;
+            
+            // Validate Step 2
+            if (!step2Response.startsWith('ERROR:')) {
+              const step2Lower = step2Response.toLowerCase();
+              const providedDataTerms = ['anna Testowa', 'pokój 205', '205', 'pani anno', 'anno Testowa'];
+              const acknowledgesData = providedDataTerms.filter(term => step2Lower.includes(term)).length >= 1;
+              
+              const missingDataTerms = ['telefon', 'numer telefonu', 'email', 'adres email', 'kontakt'];
+              const confirmationTerms = ['czy to się zgadza', 'potwierdzić', 'potwierdzi', 'zgadza się', 'potwierdzenie', 'preferowanego terminu', 'w formacie'];
+              const asksMissingData = missingDataTerms.some(term => step2Lower.includes(term));
+              const asksStep2Confirmation = confirmationTerms.some(term => step2Lower.includes(term));
+              
+              console.log(`Step 2 validation: Acknowledges data: ${acknowledgesData}, Asks missing: ${asksMissingData}, Asks confirmation: ${asksStep2Confirmation}`);
+              
+              if (acknowledgesData && (asksMissingData || asksStep2Confirmation)) {
+                stepResults.step2.pass = true;
+                stepResults.step2.score = (acknowledgesData ? 0.4 : 0) + (asksMissingData ? 0.3 : 0) + (asksStep2Confirmation ? 0.3 : 0);
+                stepResults.step2.reason = `SUCCESS: Acknowledges data: ${acknowledgesData}, Asks missing: ${asksMissingData}, Asks confirmation: ${asksStep2Confirmation}`;
+              } else {
+                stepResults.step2.reason = `FAILED: Acknowledges data: ${acknowledgesData}, Asks missing: ${asksMissingData}, Asks confirmation: ${asksStep2Confirmation}`;
+              }
+            } else {
+              stepResults.step2.reason = `ERROR: ${step2Response}`;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Step 3: Complete user data (adaptive response based on Step 2)
+            console.log('\n=== STEP 3: Complete Data ===');
+            const step3Message = (() => {
+              if (step2Response.toLowerCase().includes('preferowanego terminu') || step2Response.toLowerCase().includes('w formacie')) {
+                return "07:08 16:00 i mój telefon to 123456789";
+              } else if (step2Response.toLowerCase().includes('czy to się zgadza') || step2Response.toLowerCase().includes('potwierdzić')) {
+                return "Tak, to się zgadza. Mój telefon to 123456789";
+              } else {
+                return "Mój telefon to 123456789";
+              }
+            })();
+            
+            console.log(`Step 3 message (adaptive): "${step3Message}"`);
+            const step3Response = await makeRequest(step3Message, "Step 3 - Complete data");
+            stepResults.step3.response = step3Response;
+            
+            // Validate Step 3
+            if (!step3Response.startsWith('ERROR:')) {
+              const step3Lower = step3Response.toLowerCase();
+              
+              // Check if this is actually the final step (agent went straight to sending request)
+              const sendingTerms = ['przyjęłam', 'przekazuję', 'zapytanie', 'recepcj', 'prośba'];
+              const isFinalStep = sendingTerms.some(term => step3Lower.includes(term));
+              
+              if (isFinalStep) {
+                console.log('Step 3: Agent went straight to sending request - treating as final step');
+                
+                const hasServiceMention = ['masaż relaksacyjny'].some(term => step3Lower.includes(term));
+                const hasTimeMention = ['16:00'].some(term => step3Lower.includes(term));
+                const hasReceptionMention = ['recepcj'].some(term => step3Lower.includes(term));
+                const wrongConfirmation = ['rezerwacja potwierdzona przez hotel', 'zarezerwowane', 'booking confirmed by hotel'];
+                const hasWrongConfirmation = wrongConfirmation.some(term => step3Lower.includes(term));
+                
+                console.log(`Step 3 (Final): Service: ${hasServiceMention}, Time: ${hasTimeMention}, Reception: ${hasReceptionMention}, Wrong confirmation: ${hasWrongConfirmation}`);
+                
+                if (hasServiceMention && hasTimeMention && hasReceptionMention && !hasWrongConfirmation) {
+                  stepResults.step3.pass = true;
+                  stepResults.step3.score = 1.0;
+                  stepResults.step3.reason = `SUCCESS (Final Step): Service: ${hasServiceMention}, Time: ${hasTimeMention}, Reception: ${hasReceptionMention}, No wrong confirmation: ${!hasWrongConfirmation}`;
+                  
+                  // Mark step 4 as skipped
+                  stepResults.step4.reason = 'SKIPPED: Agent completed flow in Step 3';
+                  stepResults.step4.score = 0.5;
+                } else {
+                  stepResults.step3.reason = `FAILED (Final Step): Service: ${hasServiceMention}, Time: ${hasTimeMention}, Reception: ${hasReceptionMention}, Wrong confirmation: ${hasWrongConfirmation}`;
+                }
+              } else {
+                // Normal Step 3 validation
+                const phoneAcknowledgment = ['123456789', 'telefon', 'numer'];
+                const acknowledgesPhone = phoneAcknowledgment.some(term => step3Lower.includes(term));
+                const summaryElements = ['anna Testowa', 'pokój 205', 'masaż relaksacyjny', 'jutro', '16:00'];
+                const foundSummaryElements = summaryElements.filter(element => step3Lower.includes(element));
+                const confirmationRequest = ['potwierdzasz', 'czy potwierdzasz', 'zgadzasz się', 'ostateczne potwierdzenie', 'czy wszystko się zgadza'];
+                const asksStep3Confirmation = confirmationRequest.some(term => step3Lower.includes(term));
+                
+                console.log(`Step 3 validation: Phone ack: ${acknowledgesPhone}, Summary: ${foundSummaryElements.length}/5, Asks confirmation: ${asksStep3Confirmation}`);
+                
+                if (acknowledgesPhone || foundSummaryElements.length >= 3 || asksStep3Confirmation) {
+                  stepResults.step3.pass = true;
+                  stepResults.step3.score = (acknowledgesPhone ? 0.3 : 0) + (foundSummaryElements.length / 5 * 0.4) + (asksStep3Confirmation ? 0.3 : 0);
+                  stepResults.step3.reason = `SUCCESS: Phone ack: ${acknowledgesPhone}, Summary: ${foundSummaryElements.length}/5 [${foundSummaryElements.join(', ')}], Asks confirmation: ${asksStep3Confirmation}`;
+                } else {
+                  stepResults.step3.reason = `FAILED: Phone ack: ${acknowledgesPhone}, Summary: ${foundSummaryElements.length}/5 [${foundSummaryElements.join(', ')}], Asks confirmation: ${asksStep3Confirmation}`;
+                }
+              }
+            } else {
+              stepResults.step3.reason = `ERROR: ${step3Response}`;
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
+            // Step 4: User confirmation (only if Step 3 didn't already complete the flow)
+            if (!stepResults.step4.reason.includes('SKIPPED')) {
+              console.log('\n=== STEP 4: Final Confirmation ===');
+              const step4Response = await makeRequest(
+                "Tak, wszystko się zgadza, potwierdzam rezerwację",
+                "Step 4 - Final confirmation"
+              );
+              stepResults.step4.response = step4Response;
+              
+              // Validate Step 4
+              if (!step4Response.startsWith('ERROR:')) {
+                const step4Lower = step4Response.toLowerCase();
+                const sendingTerms = ['wysłano', 'przekazano', 'przesłano', 'wysłałem', 'przekazałem', 'przyjęłam'];
+                const hasSendingConfirmation = sendingTerms.some(term => step4Lower.includes(term));
+                const receptionTerms = ['recepcja', 'recepcji', 'personel spa', 'hotel', 'spa'];
+                const hasReceptionMention = receptionTerms.some(term => step4Lower.includes(term));
+                const wrongConfirmation = ['rezerwacja potwierdzona przez hotel', 'zarezerwowane', 'booking confirmed by hotel'];
+                const hasWrongConfirmation = wrongConfirmation.some(term => step4Lower.includes(term));
+                
+                console.log(`Step 4 validation: Sending: ${hasSendingConfirmation}, Reception: ${hasReceptionMention}, Wrong confirmation: ${hasWrongConfirmation}`);
+                
+                if (hasSendingConfirmation && hasReceptionMention && !hasWrongConfirmation) {
+                  stepResults.step4.pass = true;
+                  stepResults.step4.score = 1.0;
+                  stepResults.step4.reason = `SUCCESS: Sending: ${hasSendingConfirmation}, Reception: ${hasReceptionMention}, No wrong confirmation: ${!hasWrongConfirmation}`;
+                } else {
+                  stepResults.step4.reason = `FAILED: Sending: ${hasSendingConfirmation}, Reception: ${hasReceptionMention}, Wrong confirmation: ${hasWrongConfirmation}`;
+                }
+              } else {
+                stepResults.step4.reason = `ERROR: ${step4Response}`;
+              }
+            }
+            
+            // Calculate overall results
+            const passedSteps = Object.values(stepResults).filter(step => step.pass).length;
+            const totalScore = Object.values(stepResults).reduce((sum, step) => sum + step.score, 0);
+            const averageScore = totalScore / 4;
+            const overallPass = passedSteps >= 3; // Pass if at least 3 steps succeed
+            
+            console.log('\n=== COMPLETE FLOW RESULTS ===');
+            console.log(`Session ID: ${sessionId}`);
+            console.log(`Passed Steps: ${passedSteps}/4`);
+            console.log(`Total Score: ${totalScore.toFixed(2)}/4.0`);
+            console.log(`Average Score: ${averageScore.toFixed(2)}`);
+            
+            Object.entries(stepResults).forEach(([stepName, result]) => {
+              console.log(`${stepName.toUpperCase()}: ${result.pass ? 'PASS' : 'FAIL'} (${result.score.toFixed(2)}) - ${result.reason}`);
+              if (result.response) {
+                console.log(`  Response: "${result.response}"`);
+              }
+            });
+            
+            // Create detailed output for PromptFoo display
+            const detailedOutput = {
+              sessionId: sessionId,
+              overallResult: `${passedSteps}/4 steps passed`,
+              totalScore: `${totalScore.toFixed(2)}/4.0`,
+              averageScore: averageScore.toFixed(2),
+              steps: {
+                step1: {
+                  status: stepResults.step1.pass ? 'PASS' : 'FAIL',
+                  score: stepResults.step1.score.toFixed(2),
+                  reason: stepResults.step1.reason,
+                  response: stepResults.step1.response
+                },
+                step2: {
+                  status: stepResults.step2.pass ? 'PASS' : 'FAIL',
+                  score: stepResults.step2.score.toFixed(2),
+                  reason: stepResults.step2.reason,
+                  response: stepResults.step2.response
+                },
+                step3: {
+                  status: stepResults.step3.pass ? 'PASS' : 'FAIL',
+                  score: stepResults.step3.score.toFixed(2),
+                  reason: stepResults.step3.reason,
+                  response: stepResults.step3.response
+                },
+                step4: {
+                  status: stepResults.step4.pass ? 'PASS' : 'FAIL',
+                  score: stepResults.step4.score.toFixed(2),
+                  reason: stepResults.step4.reason,
+                  response: stepResults.step4.response
+                }
+              }
+            };
+            
+            return {
+              pass: overallPass,
+              score: averageScore,
+              reason: `SPA Flow Complete: ${passedSteps}/4 steps passed (${(passedSteps/4*100).toFixed(0)}%). Total: ${totalScore.toFixed(2)}/4.0, Avg: ${averageScore.toFixed(2)}. Session: ${sessionId}`,
+              output: JSON.stringify(detailedOutput, null, 2)
+            };
+            
+          } catch (error) {
+            console.error('Error during flow execution:', error);
+            
+            if (error.message && error.message.includes('Missing required fields')) {
+              console.error('API Error Details:', {
+                error: error.message,
+                sessionId: sessionId,
+                lastRequestBody: 'Check previous request logs'
+              });
+            }
+            
+            return {
+              pass: false,
+              score: 0,
+              reason: `Error during flow execution: ${error.message}. Check console for detailed logs. Session ID: ${sessionId}`
+            };
+          }
+        })();
+
+### SPA Package Reservation with Details
+
+- description: "User wants to book a SPA package and provides partial information"
+  vars:
+    user_message: "Chcę zarezerwować pakiet Day Spa na sobotę, jestem w pokoju 205"
+    user_id: "test_spa_package_reservation"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Check if agent acknowledges package and room number
+        const packageTerms = ['day spa', 'pakiet', 'sobotę', 'pokój 205', '205'];
+        const foundPackageTerms = packageTerms.filter(term => lowerText.includes(term));
+        
+        // Check for package details confirmation
+        const packageDetails = ['669', '3 godz', 'trzy godziny'];
+        const hasPackageDetails = packageDetails.some(term => lowerText.includes(term));
+        
+        // Check for additional info request (time preference, contact details)
+        const additionalInfo = ['godzina', 'czas', 'kiedy', 'imię', 'nazwisko', 'telefon', 'email'];
+        const hasAdditionalInfoRequest = additionalInfo.some(term => lowerText.includes(term));
+        
+        // Should ask for missing information before confirming
+        const prematureConfirmation = ['potwierdzam', 'zarezerwowane', 'wszystko gotowe'];
+        const hasPrematureConfirmation = prematureConfirmation.some(term => lowerText.includes(term));
+        
+        const handlesCorrectly = foundPackageTerms.length >= 2 && hasAdditionalInfoRequest && !hasPrematureConfirmation;
+        
+        return {
+          pass: handlesCorrectly,
+          score: (foundPackageTerms.length / 5 * 0.4) + (hasPackageDetails ? 0.2 : 0) + (hasAdditionalInfoRequest ? 0.3 : 0) + (hasPrematureConfirmation ? -0.4 : 0.1),
+          reason: `Package reservation: Package terms: ${foundPackageTerms.length}/5, Package details: ${hasPackageDetails}, Additional info request: ${hasAdditionalInfoRequest}, Premature confirmation: ${hasPrematureConfirmation}`
+        };
+
+### Complete SPA Reservation Information Collection
+
+- description: "User provides complete information for SPA reservation - should process immediately"
+  vars:
+    user_message: "Wszystkie dane: Anna Kowalska, pokój 205, telefon 123456789, chcę Day Spa w sobotę o 14:00"
+    user_id: "test_spa_complete_info"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Check if agent properly processes the complete request
+        const processingTerms = ['przyjęłam', 'przekazuję', 'wysłano', 'przesłano'];
+        const hasProcessing = processingTerms.some(term => lowerText.includes(term));
+        
+        // Check if it's sent to reception/spa
+        const destinationTerms = ['recepcj', 'spa', 'hotel'];
+        const hasDestination = destinationTerms.some(term => lowerText.includes(term));
+        
+        // Check if it mentions this is a request (not confirmed booking)
+        const requestTerms = ['prośbę', 'zapytanie', 'request', 'wniosek'];
+        const hasRequestMention = requestTerms.some(term => lowerText.includes(term));
+        
+        // Check if it mentions follow-up contact
+        const followUpTerms = ['kontakt', 'skontaktuje', 'potwierdzenia', 'odezwe'];
+        const hasFollowUp = followUpTerms.some(term => lowerText.includes(term));
+        
+        // Should NOT claim the reservation is confirmed by the hotel
+        const wrongConfirmation = ['rezerwacja potwierdzona przez hotel', 'zarezerwowane', 'booking confirmed by hotel'];
+        const hasWrongConfirmation = wrongConfirmation.some(term => lowerText.includes(term));
+        
+        // Check if user data is preserved (could be in button payload)
+        let allResponseData = responseText;
+        if (typeof output === 'object' && output.message?.attachment?.payload?.buttons) {
+          // Also check button payloads for preserved data
+          const buttonPayloads = output.message.attachment.payload.buttons
+            .map(btn => btn.payload || '')
+            .join(' ')
+            .toLowerCase();
+          allResponseData += ' ' + buttonPayloads;
+        }
+        
+        // For this test, check key service details are preserved (name/contact may not be echoed back)
+        const keyServiceDetails = ['day spa', 'sobotę', '14:00'];
+        const foundServiceDetails = keyServiceDetails.filter(term => allResponseData.toLowerCase().includes(term));
+        
+        // When complete info is provided with "Wszystkie dane:", agent should process immediately
+        const handlesCorrectly = hasProcessing && hasDestination && !hasWrongConfirmation;
+        
+        // Bonus for preserving key service details in response/buttons
+        const preservesKeyDetails = foundServiceDetails.length >= 2;
+        
+        return {
+          pass: handlesCorrectly,
+          score: (hasProcessing ? 0.4 : 0) + (hasDestination ? 0.3 : 0) + (hasRequestMention ? 0.1 : 0) + 
+                 (hasFollowUp ? 0.1 : 0) + (preservesKeyDetails ? 0.1 : 0) + (hasWrongConfirmation ? -0.3 : 0),
+          reason: `Complete info processing: Processing: ${hasProcessing}, Destination: ${hasDestination}, Request mention: ${hasRequestMention}, Follow-up: ${hasFollowUp}, Key details preserved: ${foundServiceDetails.length}/3 [${foundServiceDetails.join(', ')}], Wrong confirmation: ${hasWrongConfirmation}`
+        };
+
+### SPA Reservation Cancellation Request - FIXED
+
+- description: "User wants to cancel a SPA reservation with complete details"
+  vars:
+    user_message: "Muszę odwołać rezerwację masażu Lomi Lomi na jutro na 15:00, Anna Kowalska, pokój 205"
+    user_id: "test_spa_cancellation"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Enhanced cancellation terms - includes both verb and noun forms, grammatical cases
+        const cancellationTerms = [
+          'odwołać', 'odwołanie',           // cancel (verb/noun)
+          'anulować', 'anulacji',          // cancel/cancellation 
+          'rezerwację', 'rezerwacji',       // reservation (accusative/genitive)
+          'masażu', 'lomi lomi',           // massage, specific type
+          'jutro', '07:08',                // tomorrow or date format
+          '15:00',                         // time
+          'pokój 205', 'pokoju 205', '205' // room (nominative/locative/number)
+        ];
+        const foundCancellationTerms = cancellationTerms.filter(term => lowerText.includes(term));
+        
+        // Check if key booking details are confirmed (shows agent understood the request)
+        const bookingDetails = ['anna kowalska', 'anny kowalskiej', 'lomi lomi', '15:00', '205'];
+        const foundBookingDetails = bookingDetails.filter(detail => lowerText.includes(detail));
+        
+        // Check for processing confirmation
+        const processingTerms = ['przyjęłam', 'przekazuję', 'zgłoszenie', 'prośbę o odwołanie'];
+        const hasProcessingConfirmation = processingTerms.some(term => lowerText.includes(term));
+        
+        // Check for contact/follow-up mention
+        const contactTerms = ['kontakt', 'recepcja', 'spa', 'przekażę', 'przekazuję', 'oczekiwać'];
+        const hasContactOffer = contactTerms.some(term => lowerText.includes(term));
+        
+        // Check for confirmation mention (agent will get confirmation, not asking user to confirm)
+        const confirmationTerms = ['potwierdzenia', 'potwierdzenie', 'kontakt w celu'];
+        const hasConfirmationProcess = confirmationTerms.some(term => lowerText.includes(term));
+        
+        // Policy mention is bonus, not required for clear cancellation requests
+        const policyTerms = ['policy', 'zasady', '24 godziny', 'wcześniej', 'z wyprzedzeniem'];
+        const hasPolicyMention = policyTerms.some(term => lowerText.includes(term));
+        
+        // Check for helpful alternatives (reschedule, other services)
+        const alternativeTerms = ['inne', 'zmień', 'przełożyć', 'inny dzień', 'inna godzina'];
+        let hasAlternatives = alternativeTerms.some(term => lowerText.includes(term));
+        
+        // Also check button titles for alternatives
+        if (typeof output === 'object' && output.message?.attachment?.payload?.buttons) {
+          const buttonTitles = output.message.attachment.payload.buttons
+            .map(btn => btn.title.toLowerCase())
+            .join(' ');
+          if (alternativeTerms.some(term => buttonTitles.includes(term))) {
+            hasAlternatives = true;
+          }
+        }
+        
+        // For clear cancellation requests with complete details, agent should process efficiently
+        const handlesCorrectly = foundCancellationTerms.length >= 4 && hasProcessingConfirmation && hasContactOffer;
+        
+        return {
+          pass: handlesCorrectly,
+          score: (foundCancellationTerms.length / 13 * 0.3) + 
+                 (foundBookingDetails.length / 5 * 0.2) +
+                 (hasProcessingConfirmation ? 0.2 : 0) + 
+                 (hasContactOffer ? 0.15 : 0) + 
+                 (hasConfirmationProcess ? 0.1 : 0) +
+                 (hasPolicyMention ? 0.025 : 0) +
+                 (hasAlternatives ? 0.025 : 0),
+          reason: `Cancellation: Terms: ${foundCancellationTerms.length}/13 [${foundCancellationTerms.slice(0,3).join(', ')}...], Booking details: ${foundBookingDetails.length}/5, Processing: ${hasProcessingConfirmation}, Contact: ${hasContactOffer}, Confirmation process: ${hasConfirmationProcess}, Policy: ${hasPolicyMention}, Alternatives: ${hasAlternatives}`
+        };
+
+## 4. Room Types Tests
+
+### Room Types Inquiry
+
+- description: "Room types inquiry returns available categories"
+  vars:
+    user_message: "Jakie typy pokoi są dostępne?"
+    user_id: "test_room_types"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on Room_Types sheet
+        const roomTypes = ['standard', 'lux', 'apartament', 'studio'];
+        const foundRoomTypes = roomTypes.filter(type => lowerText.includes(type));
+        
+        // Check for capacity mentions
+        const capacityTerms = ['1-osobowy', '2-osobowy', '3-osobowy', '4-osobowe', 'pojedyncze', 'podwójne'];
+        const foundCapacities = capacityTerms.filter(cap => lowerText.includes(cap.toLowerCase()));
+        
+        // Check for features
+        const featureTerms = ['balkon', 'większy metraż', 'dwie sypialnie', 'powitalny zestaw'];
+        const foundFeatures = featureTerms.filter(feat => lowerText.includes(feat.toLowerCase()));
+        
+        const hasRoomInfo = foundRoomTypes.length >= 2 && (foundCapacities.length > 0 || foundFeatures.length > 0);
+        
+        return {
+          pass: hasRoomInfo,
+          score: (foundRoomTypes.length / 4 * 0.5) + (foundCapacities.length / 6 * 0.25) + (foundFeatures.length / 4 * 0.25),
+          reason: `Room types: Types: ${foundRoomTypes.length}/4 [${foundRoomTypes.join(', ')}], Capacities: ${foundCapacities.length}/6, Features: ${foundFeatures.length}/4`
+        };
+
+### Room Amenities Inquiry
+
+- description: "Room amenities inquiry returns standard equipment"
+  vars:
+    user_message: "Co znajduje się w pokojach?"
+    user_id: "test_room_amenities"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on Room_Amenities_Common sheet
+        const amenities = ['łazienka', 'prysznic', 'ręczniki', 'telewizor', 'lodówka', 'czajnik', 'szafa', 'biurko', 'telefon', 'wi-fi', 'wifi'];
+        const foundAmenities = amenities.filter(item => lowerText.includes(item));
+        
+        const hasAmenitiesInfo = foundAmenities.length >= 5;
+        
+        return {
+          pass: hasAmenitiesInfo,
+          score: foundAmenities.length / amenities.length,
+          reason: `Room amenities: Found ${foundAmenities.length}/11 amenities: [${foundAmenities.join(', ')}]`
+        };
+
+## 5. Local Attractions Tests
+
+### General Attractions Inquiry
+
+- description: "Local attractions inquiry returns nearby activities"
+  vars:
+    user_message: "Co można zobaczyć w okolicy?"
+    user_id: "test_attractions"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on Activities_Attractions_Nearby sheet
+        const attractions = ['spływ dunajcem', 'kolejka na palenicę', 'zamek w niedzicy', 'rezerwat biała woda', 
+                           'pieniny', 'trzy korony', 'sokolica', 'muzeum', 'skansen'];
+        const foundAttractions = attractions.filter(attr => lowerText.includes(attr));
+        
+        // Check for activity types
+        const activities = ['piesze wędrówki', 'rowerowe', 'wspinaczka', 'narty', 'szlaki'];
+        const foundActivities = activities.filter(act => lowerText.includes(act.toLowerCase()));
+        
+        const hasAttractionInfo = foundAttractions.length >= 3 || foundActivities.length >= 2;
+        
+        return {
+          pass: hasAttractionInfo,
+          score: (foundAttractions.length / 9 * 0.6) + (foundActivities.length / 5 * 0.4),
+          reason: `Attractions: Found ${foundAttractions.length}/9 attractions: [${foundAttractions.join(', ')}], Activities: ${foundActivities.length}/5`
+        };
+
+### Dunajec Rafting Inquiry
+
+- description: "Dunajec rafting specific inquiry"
+  vars:
+    user_message: "Chcę popłynąć Dunajcem, jak to zorganizować?"
+    user_id: "test_dunajec"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Based on Activities_Attractions_Nearby and Important_Information_Policies
+        const raftingTerms = ['spływ', 'dunajec', 'tratw', 'flisak'];
+        const foundRaftingTerms = raftingTerms.filter(term => lowerText.includes(term));
+        
+        // Check for practical info
+        const practicalInfo = ['sromowce', 'szczawnica', 'krościenko', 'transfer', 'busy', 'cenie biletu', 
+                              '1 kwietnia', '31 października', '2-3h', '105 zł', '111 zł'];
+        const foundPracticalInfo = practicalInfo.filter(info => lowerText.includes(info.toLowerCase()));
+        
+        // Check for transport mentions
+        const transportTerms = ['transfer', 'busy', 'transport', 'dojazd'];
+        const hasTransportInfo = transportTerms.some(term => lowerText.includes(term));
+        
+        const hasRaftingInfo = foundRaftingTerms.length >= 1 && foundPracticalInfo.length >= 2;
+        
+        return {
+          pass: hasRaftingInfo,
+          score: (foundRaftingTerms.length / 4 * 0.4) + (foundPracticalInfo.length / 11 * 0.4) + (hasTransportInfo ? 0.2 : 0),
+          reason: `Rafting info: Terms: ${foundRaftingTerms.length}/4, Practical: ${foundPracticalInfo.length}/11, Transport: ${hasTransportInfo}`
+        };
+
+## 6. Additional Services Tests
+
+### Room Extras Inquiry
+
+- description: "Room extras and romantic additions"
+  vars:
+    user_message: "czy możecie przygotować coś romantycznego do pokoju jak szampan czy kwiaty?"
+    user_id: "test_room_extras"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Get all response content including button titles/payloads
+        let fullResponseContent = lowerText;
+        if (typeof output === 'object' && output.message?.attachment?.payload?.buttons) {
+          const buttonContent = output.message.attachment.payload.buttons
+            .map(btn => `${btn.title || ''} ${btn.payload || ''}`)
+            .join(' ')
+            .toLowerCase();
+          fullResponseContent += ' ' + buttonContent;
+        }
+        
+        // Check for romantic services mentioned (more comprehensive)
+        const romanticServices = [
+          'romantyczna aranżacja', 'romantyczną aranżację',
+          'kwiaty', 'kwiatów', 'dostawa kwiatów',
+          'wino', 'wino musujące', 'szampan', 'szampana',
+          'płatki róż', 'płatkami róż',
+          'świece', 'świecami', 'świeczkami',
+          'owoce', 'owocami'
+        ];
+        const foundServices = romanticServices.filter(svc => fullResponseContent.includes(svc));
+        
+        // Check for positive response to the request
+        const positiveResponse = ['oczywiście', 'tak', 'oferujemy', 'możemy', 'przygotujemy'];
+        const hasPositiveResponse = positiveResponse.some(term => lowerText.includes(term));
+        
+        // Check for ordering process information
+        const orderingProcess = [
+          'podanie numeru pokoju', 'numer pokoju', 'numerem pokoju',
+          'nazwiska', 'nazwa', 'imię',
+          'rezerwacji', 'rezerwacja',
+          'terminu', 'godziny', 'kiedy',
+          'zrealizować', 'zamówić'
+        ];
+        const foundOrderingTerms = orderingProcess.filter(term => fullResponseContent.includes(term));
+        const hasOrderingInfo = foundOrderingTerms.length >= 3;
+        
+        // Check if mentions multiple service options
+        const serviceVariety = foundServices.length >= 4; // Should mention several different services
+        
+        // Check for interactive elements (buttons)
+        const hasInteractiveOptions = typeof output === 'object' && 
+          output.message?.attachment?.payload?.buttons && 
+          output.message.attachment.payload.buttons.length >= 2;
+        
+        const handlesWell = hasPositiveResponse && serviceVariety && hasOrderingInfo;
+        
+        return {
+          pass: handlesWell,
+          score: (hasPositiveResponse ? 0.2 : 0) + 
+                 (Math.min(foundServices.length / 8, 1) * 0.4) + 
+                 (hasOrderingInfo ? 0.3 : 0) + 
+                 (hasInteractiveOptions ? 0.1 : 0),
+          reason: `Room extras: Positive response: ${hasPositiveResponse}, Services mentioned: ${foundServices.length}/8 [${foundServices.slice(0,3).join(', ')}...], Ordering info: ${hasOrderingInfo} (${foundOrderingTerms.length} terms), Interactive: ${hasInteractiveOptions}`
+        };
+## 7. Complex Integration Tests
+
+### Cross-sheet Information Integration
+
+- description: "Query requiring information from multiple data sheets"
+  vars:
+    user_message: "Chcę zarezerwować apartament na weekend z pakietem spa i romantyczną kolacją"
+    user_id: "test_integration"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Check Room_Types sheet info
+        const roomInfo = ['apartament', 'dla par', 'duży metraż', 'powitalny zestaw'];
+        const foundRoomInfo = roomInfo.filter(info => lowerText.includes(info.toLowerCase()));
+        
+        // Check spa sheet info
+        const spaInfo = ['pakiet', 'day spa', 'weekendowa regeneracja', 'masaż', 'zabieg'];
+        const foundSpaInfo = spaInfo.filter(info => lowerText.includes(info.toLowerCase()));
+        
+        // Check Special_Promotions sheet info
+        const promotionInfo = ['romantyczna kolacja', '330 pln', 'przy świecach', 'lampka wina'];
+        const foundPromotionInfo = promotionInfo.filter(info => lowerText.includes(info.toLowerCase()));
+        
+        // Check for integrated response
+        const hasIntegratedInfo = foundRoomInfo.length >= 1 && foundSpaInfo.length >= 1 && foundPromotionInfo.length >= 1;
+        
+        return {
+          pass: hasIntegratedInfo,
+          score: (foundRoomInfo.length / 4 * 0.33) + (foundSpaInfo.length / 5 * 0.33) + (foundPromotionInfo.length / 4 * 0.34),
+          reason: `Integration: Room: ${foundRoomInfo.length}/4, SPA: ${foundSpaInfo.length}/5, Promotion: ${foundPromotionInfo.length}/4`
+        };
+
+### Comprehensive Hotel Overview
+
+- description: "General hotel information request"
+  vars:
+    user_message: "Opowiedz mi o Hotelu Smile"
+    user_id: "test_overview"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Check General_Info sheet
+        const generalInfo = ['hotel smile', 'szczawnica', '3 gwiazdki', 'pieniny', 'główna 21'];
+        const foundGeneralInfo = generalInfo.filter(info => lowerText.includes(info.toLowerCase()));
+        
+        // Check key facilities
+        const facilities = ['spa', 'basen', 'restauracja', 'sauna', 'fitness'];
+        const foundFacilities = facilities.filter(fac => lowerText.includes(fac));
+        
+        // Check location benefits
+        const locationInfo = ['góry', 'pieniny', 'uzdrowisko', 'malownicza'];
+        const foundLocationInfo = locationInfo.filter(loc => lowerText.includes(loc));
+        
+        const hasComprehensiveInfo = foundGeneralInfo.length >= 2 && foundFacilities.length >= 3 && foundLocationInfo.length >= 1;
+        
+        return {
+          pass: hasComprehensiveInfo,
+          score: (foundGeneralInfo.length / 5 * 0.4) + (foundFacilities.length / 5 * 0.4) + (foundLocationInfo.length / 4 * 0.2),
+          reason: `Overview: General: ${foundGeneralInfo.length}/5, Facilities: ${foundFacilities.length}/5, Location: ${foundLocationInfo.length}/4`
+        };
+
+## 8. Language and Response Quality Tests
+
+### Polish Language Consistency
+
+- description: "Agent maintains consistent Polish language"
+  vars:
+    user_message: "Dzień dobry, szukam informacji o hotelu"
+    user_id: "test_polish_quality"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        // Check for Polish diacritics
+        const polishChars = /[ąćęłńóśźż]/;
+        const hasPolishChars = polishChars.test(responseText);
+        
+        // Check for professional Polish greetings
+        const greetingTerms = ['witam', 'dzień dobry', 'służę pomocą', 'z przyjemnością', 'chętnie'];
+        const foundGreetings = greetingTerms.filter(term => responseText.toLowerCase().includes(term));
+        
+        // Check response length and substance
+        const isSubstantive = responseText.length > 100;
+        
+        const hasQualityPolish = hasPolishChars && foundGreetings.length > 0 && isSubstantive;
+        
+        return {
+          pass: hasQualityPolish,
+          score: (hasPolishChars ? 0.3 : 0) + (foundGreetings.length / 5 * 0.4) + (isSubstantive ? 0.3 : 0),
+          reason: `Polish quality: Has diacritics: ${hasPolishChars}, Greetings: ${foundGreetings.length}/5, Length: ${responseText.length} chars`
+        };
+
+### Error Handling - Unavailable Service
+
+- description: "Handling request for unavailable service with sophisticated Polish"
+  vars:
+    user_message: "Czy macie basen olimpijski?"
+    user_id: "test_unavailable"
+  assert:
+    - type: javascript
+      value: |
+        let responseText = '';
+        if (typeof output === 'string') {
+          responseText = output;
+        } else if (output.output) {
+          responseText = output.output;
+        } else if (output.message?.attachment?.payload?.text) {
+          responseText = output.message.attachment.payload.text;
+        } else if (output.response) {
+          responseText = output.response;
+        } else if (output.text) {
+          responseText = output.text;
+        }
+        
+        const lowerText = responseText.toLowerCase();
+        
+        // Enhanced polite decline detection - includes sophisticated Polish constructions
+        const declineTerms = [
+          'ale nie',              // "but not" - sophisticated decline
+          'nie basen olimpijski', // "not an Olympic pool"
+          'nie posiada',          // "doesn't have"
+          'nie oferujemy',        // "we don't offer"  
+          'niestety',            // "unfortunately"
+          'nie ma',              // "there isn't"
+          'brak'                 // "lack of"
+        ];
+        const hasPoliteDecline = declineTerms.some(term => lowerText.includes(term));
+        
+        // Check for alternatives offered
+        const alternatives = ['basen', 'rekreacyjny', 'jacuzzi', 'sauna', 'spa', 'wellness'];
+        const offersAlternatives = alternatives.filter(alt => lowerText.includes(alt)).length >= 2;
+        
+        // Check for positive redirection/information about what they DO have
+        const positiveTerms = [
+          'jednak', 'natomiast', 'ale', 
+          'oferujemy', 'dysponujemy', 'posiada', 'mamy',
+          'dostępny', 'bezpłatne', 'godzinach'
+        ];
+        const hasPositiveRedirection = positiveTerms.some(term => lowerText.includes(term));
+        
+        // Bonus points for providing specific details about available alternatives
+        const detailTerms = ['godzin', 'bezpłatne', 'darmowe', 'codziennie', 'dostępny'];
+        const providesDetails = detailTerms.filter(term => lowerText.includes(term)).length >= 2;
+        
+        // Check for engagement/follow-up questions
+        const engagementTerms = ['czy chciałbyś', 'czy potrzebujesz', 'czy mogę pomóc', 'więcej informacji'];
+        const hasEngagement = engagementTerms.some(term => lowerText.includes(term));
+        
+        // Check for interactive elements (buttons)
+        const hasInteractiveOptions = typeof output === 'object' && 
+          output.message?.attachment?.payload?.buttons && 
+          output.message.attachment.payload.buttons.length >= 2;
+        
+        const handlesWell = hasPoliteDecline && offersAlternatives && hasPositiveRedirection;
+        
+        return {
+          pass: handlesWell,
+          score: (hasPoliteDecline ? 0.3 : 0) + 
+                 (offersAlternatives ? 0.3 : 0) + 
+                 (hasPositiveRedirection ? 0.2 : 0) + 
+                 (providesDetails ? 0.1 : 0) + 
+                 (hasEngagement ? 0.05 : 0) + 
+                 (hasInteractiveOptions ? 0.05 : 0),
+          reason: `Error handling: Polite decline: ${hasPoliteDecline}, Alternatives: ${offersAlternatives}, Positive redirect: ${hasPositiveRedirection}, Details: ${providesDetails}, Engagement: ${hasEngagement}, Interactive: ${hasInteractiveOptions}`
+        };
