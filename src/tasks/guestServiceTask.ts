@@ -57,6 +57,11 @@ export class GuestServiceTask {
         content: input.excelData,
         timestamp: Date.now(),
       },
+      {
+        role: "system",
+        content: "Today's date is: " + new Date().toISOString(),
+        timestamp: Date.now(),
+      },
       ...input.sessionHistory.messages,
       {
         role: "user",

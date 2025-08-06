@@ -155,7 +155,7 @@ export class EmailTask {
       },
       {
         role: "system",
-        content: "Today is: " + new Date().toISOString(),
+        content: "Today's date is: " + new Date().toISOString(),
         timestamp: Date.now(),
       },
       ...emailSessionHistory.messages,
