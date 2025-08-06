@@ -139,13 +139,13 @@ export class ButtonsTask {
       {
         role: "system",
         content: input.previousMessageLanguage
-          ? `The previous message language is: ${input.previousMessageLanguage}`
+          ? `The previous message language was: ${input.previousMessageLanguage}`
           : "",
         timestamp: Date.now(),
       },
       {
         role: "user",
-        content: `Create buttons for the following message: ${input.userMessage}`,
+        content: `Create buttons and a language for the following message: "${input.userMessage}"`,
         timestamp: Date.now(),
       },
     ];
