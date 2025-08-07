@@ -12,7 +12,7 @@ import { convertToDetailedUsage, logUsageDetails } from "../utils/usageTracker";
 export interface ButtonsTaskInput {
   userMessage: string;
   previousMessageLanguage?: string;
-  firstCallOutput?: string; // Make this optional
+  firstCallOutput: string;
   excelData: string;
   buttonsPrompt: LangfusePrompt | null;
   tenantConfig: TenantConfig | null;
@@ -138,6 +138,16 @@ export class ButtonsTask {
       },
       {
         role: "system",
+        content: `Today's date is ${new Date().toLocaleDateString()}`,
+        timestamp: Date.now(),
+      },
+      {
+        role: "system",
+        content: `The user message is: "${input.userMessage}"`,
+        timestamp: Date.now(),
+      },
+      {
+        role: "system",
         content: input.previousMessageLanguage
           ? `The previous message language was: ${input.previousMessageLanguage}`
           : "",
@@ -145,7 +155,7 @@ export class ButtonsTask {
       },
       {
         role: "user",
-        content: `Create buttons and a language for the following assistant response: "${input.userMessage}"`,
+        content: `Create buttons and a language for the following assistant response: "${input.firstCallOutput}"`,
         timestamp: Date.now(),
       },
     ];
