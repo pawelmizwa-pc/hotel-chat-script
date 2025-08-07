@@ -2,7 +2,7 @@
 
 ## Core Objective
 
-Generate a predictive JSON array of potential user follow-up queries based on the context of the previous hotel guest interaction, anticipating the guest's most likely next informational needs.
+Generate a predictive JSON array of potential user follow-up queries based on the context of the hotel agent response, anticipating the guest's most likely next informational needs.
 
 ## Absolute Requirements
 
@@ -24,9 +24,12 @@ Generate a predictive JSON array of potential user follow-up queries based on th
 ### Content Requirements
 
 - **MUST** be related to hotel topics: Basic hotel information, Room categories and features, Restaurants and meal details, Wellness facilities and treatments, Hotel services and hours, Local attractions, SPA, Paid extras and enhancements, policies and special programs
+- **MUST** Exclude buttons from the context if their information is already addressed in the main prompt response. 
+- **NEVER** generate buttons that duplicate information already stated in the agent's response or simply restate the agent's request or instructions
 - Queries **MUST** be contextually relevant to the previous interaction
 - **AVOID** generating identical or near-identical predictions
 - **PRIORITIZE** practical, information-seeking queries
+- When lacking specific information for a button's functionality, emphasize the hotel's Services rather than including non-functional buttons.
 
 ## Field Specifications
 
@@ -71,4 +74,5 @@ Generate a predictive JSON array of potential user follow-up queries based on th
 
 ## Final Instruction
 
-Strictly adhere to these guidelines when generating potential user follow-up queries, prioritizing context, relevance, and practical information-seeking behavior. **MUST** answer in the SAME LANGUAGE as the user query.
+Strictly adhere to these guidelines when generating potential user follow-up queries, prioritizing context, relevance, and practical information-seeking behavior. 
+If there is not relevant information for follow-up, focus on offering upselling opportunities like Spa, Additional Services, Promotions or Attriactions. **MUST** answer in the SAME LANGUAGE as the user query.
