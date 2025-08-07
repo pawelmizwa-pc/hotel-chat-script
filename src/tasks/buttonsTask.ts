@@ -145,7 +145,7 @@ export class ButtonsTask {
       },
       {
         role: "user",
-        content: `Create buttons and a language for the following message: "${input.userMessage}"`,
+        content: `Create buttons and a language for the following assistant response: "${input.userMessage}"`,
         timestamp: Date.now(),
       },
     ];

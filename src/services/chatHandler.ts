@@ -106,57 +106,48 @@ export class ChatHandler {
       this.memoryService
     );
 
-    // Execute all tasks in parallel with error handling
-    const [firstResponse, secondResponse, thirdResponse] =
-      await Promise.allSettled([
-        guestServiceTask.execute({
-          userMessage,
-          sessionHistory: collectedData.sessionHistory,
-          excelData: excelDataResult.excelData,
-          guestServicePrompt: collectedData.prompts.guestService,
-          tenantConfig: collectedData.tenantConfig,
-          sessionId,
-          llmConfig: collectedData.configs.guestService,
-          trace,
-        }),
-        buttonsTask.execute({
-          userMessage,
-          excelData: excelDataResult.excelData,
-          buttonsPrompt: collectedData.prompts.buttons,
-          tenantConfig: collectedData.tenantConfig,
-          sessionId,
-          llmConfig: collectedData.configs.buttons,
-          sessionHistory: collectedData.sessionHistory,
-          previousMessageLanguage: language,
-          trace,
-        }),
-        emailTask.execute({
-          userMessage,
-          excelData: excelDataResult.excelData,
-          emailToolPrompt: collectedData.prompts.emailTool,
-          tenantConfig: collectedData.tenantConfig,
-          sessionId,
-          tenantId,
-          llmConfig: collectedData.configs.emailTool,
-          trace,
-        }),
-      ]);
+    // Execute guest service task first
+    const firstResponse = await guestServiceTask.execute({
+      userMessage,
+      sessionHistory: collectedData.sessionHistory,
+      excelData: excelDataResult.excelData,
+      guestServicePrompt: collectedData.prompts.guestService,
+      tenantConfig: collectedData.tenantConfig,
+      sessionId,
+      llmConfig: collectedData.configs.guestService,
+      trace,
+    });
+
+    // Execute buttons and email tasks in parallel, using guest service response as input for buttons
+    const [secondResponse, thirdResponse] = await Promise.allSettled([
+      buttonsTask.execute({
+        userMessage: firstResponse.content, // Use answer output as input
+        excelData: excelDataResult.excelData,
+        buttonsPrompt: collectedData.prompts.buttons,
+        tenantConfig: collectedData.tenantConfig,
+        sessionId,
+        llmConfig: collectedData.configs.buttons,
+        sessionHistory: collectedData.sessionHistory,
+        previousMessageLanguage: language,
+        trace,
+      }),
+      emailTask.execute({
+        userMessage,
+        excelData: excelDataResult.excelData,
+        emailToolPrompt: collectedData.prompts.emailTool,
+        tenantConfig: collectedData.tenantConfig,
+        sessionId,
+        tenantId,
+        llmConfig: collectedData.configs.emailTool,
+        trace,
+      }),
+    ]);
 
     // Reset to default API keys after processing (optional, for cleanup)
     this.llmService.resetToDefaultApiKeys();
 
-    // Extract guest service task result - this is critical and should fail the request if it fails
-    if (firstResponse.status === "rejected") {
-      console.error("Guest service task failed:", firstResponse.reason);
-      throw new Error(
-        `Guest service task failed: ${
-          firstResponse.reason instanceof Error
-            ? firstResponse.reason.message
-            : String(firstResponse.reason)
-        }`
-      );
-    }
-    const guestServiceResult = firstResponse.value;
+    // Guest service task result is already available since we awaited it
+    const guestServiceResult = firstResponse;
 
     // Extract buttons task result with fallback to empty array if failed
     let buttons: Array<{
