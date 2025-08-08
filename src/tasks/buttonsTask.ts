@@ -141,11 +141,11 @@ export class ButtonsTask {
         content: `Today's date is ${new Date().toLocaleDateString()}`,
         timestamp: Date.now(),
       },
-      {
-        role: "system",
-        content: `The user message is: "${input.userMessage}"`,
-        timestamp: Date.now(),
-      },
+      // {
+      //   role: "system",
+      //   content: `The user message is: "${input.userMessage}"`,
+      //   timestamp: Date.now(),
+      // },
       {
         role: "system",
         content: input.previousMessageLanguage
